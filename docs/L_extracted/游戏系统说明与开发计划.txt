@@ -1,0 +1,661 @@
+悠L（悠哉悠哉）游戏系统说明与Godot开发计划
+
+
+本文档分为两部分：
+
+1. 悠L现有游戏系统介绍（基于Twine/SugarCube版本）
+2. 基于Godot引擎的完整开发计划（分阶段任务、技术实现要点）
+
+你可以将本文档保存为 .md 或纯文本文件，方便随时查阅。
+
+---
+
+第一部分：悠L游戏系统介绍
+
+一、核心玩法与世界观
+
+· 玩家扮演隐瞒身份的贵族少年（瓦勒姆公爵家次子），在小镇艾瑟顿独自生活。
+· 游戏以日常探索+角色养成为核心，没有强制主线，但存在每周房租压力作为短期目标。
+· 世界设定：日轮王国，中世纪奇幻背景，存在魔法与阶级对立。主要角色各有隐藏身份。
+
+二、角色系统
+
+1. 主角
+
+· 五维属性：力量（LL）、灵感（LG）、魅力（ML）、耐力（NL）、技巧（JQ）
+· 个性：勇敢（YG）、冷静（LJ）、暴躁（BZ）
+· 魔法适应性：暗（ASX）、光（GSX）、木（MSY）
+· 生活等级：通过职业升级获得经验，每150点升一级，奖励2点可分配属性点
+· 知识属性（已简化）：礼仪、历史，每100点升一级，提升对应五维
+
+2. 可攻略角色
+
+· 莱德（初始名）：外冷内热的穿越者（玩家），好感度每100点升一级，奖励莱德五维各+1。可同住、同床、约会。
+· K：伪装成精灵的天使，前王都总教会枢机，使命是帮助主角。好感度每100点升一级，奖励K五维各+1。可约会、邀请到家。
+· 奥梅尔·罗斯巴特（小奥）：红发贵族，前朝皇族后裔，幼驯染。好感度每50点升一级，2级解锁技能“贵族的手腕”（打工工资+5%），3级+10%。可借钱、进入贵族休息室。
+
+3. NPC
+
+· 辛奇（酒馆老板）、克丽丝（修女）、麦拿拿（铁匠）、黑胡子（工头）。好感度每15/30/50/70/90分界升级，1级时赠送家具（咖啡机、圣典、训练铁人、小海鸥装饰）。
+
+三、核心系统
+
+1. 时间系统
+
+· 变量：年、月、日、时、分
+· 每次行动（移动、打工、聊天等）增加5-60分钟不等
+· 分钟满60进位小时，小时满24进位天数，天数7天一周（周一重置）
+· 显示格式：年/月/日 星期 时:分
+
+2. 好感度系统
+
+· 每个角色独立好感度值（0-...），每100（小奥每50）点升一级
+· 升级时对应角色获得属性提升，并记录日志、显示通知
+· 互动方式：聊天、吃饭、散步、送礼、约会、打工等，不同选项增加不同数值
+
+3. 职业系统
+
+· 职业：服务员、见习教士、铁匠学徒、港口杂工、侍从（小奥专属）
+· 每个职业独立经验值（0-...），每100点升一级
+· 升级奖励：对应属性+1，时薪+10（侍从+15）
+· 同时增加50点生活等级经验
+· 打工每次获得20点职业经验，并根据时薪获得金币
+
+4. 打工系统
+
+· 需先在对应地点“咨询工作”解锁
+· 解锁后显示打工按钮，点击后执行1小时打工
+· 随机触发事件（80%概率）：小费、刁难、奇怪经历，部分事件有选项和属性判定
+· 莱德可参与打工（除侍从外），莱德获得独立经验和工资，并分一半给主角
+
+5. 租房系统
+
+· 每周一房东上门（10-12点）收取房租
+· 第一周300金币，后续每周700金币
+· 若钱不够，宽限3天，第4天未交被赶出
+· 被赶出后与莱德住帐篷，需凑齐欠款才能回家
+
+6. 地点系统
+
+· 十字路口：中心枢纽，可回家、去商业区、花园小镇、港口。偶遇莱德（不同时间段在不同地点）
+· 家：客厅、卧室、睡觉。独居/同居/帐篷三种状态。可聊天、送礼、约会、看书、与猫玩、邀请K
+· 商业区：广场、小吃街、杂货铺、酒馆、教堂、铁匠铺。可打工、买蜡烛、与K/辛奇/克丽丝/麦拿拿互动
+· 港口：杂工打工、眺望海边、与黑胡子互动
+· 花园小镇：闲逛、遇K种花、莱恩事件
+· 主城区：闲逛、白鸦书屋（买书，已简化）
+· 花街：进入妖精的邀请、闲逛
+· 妖精的邀请：赌场、点酒、与小奥/梅菲斯互动、参加晚宴（已简化）
+
+7. 对话与事件系统
+
+· 莱德：聊天、吃饭、散步、送礼（蜡烛）、约会、叫醒、话题（普通/特殊）
+· K：聊天、请喝酒、约会、邀请到家
+· 小奥：聊天、借钱、下棋、调酒笔记、二楼休息室
+· 打工随机事件：不同职业有独立事件池，部分有选项
+· 晚宴系统（已简化）：每周一次，随机主题，服装选择，事件选项
+
+8. 日志系统
+
+· 记录所有重要事件：约会、收养、好感升级、职业升级、赠送家具、话题等
+· 显示日期、类型、内容，按时间倒序排列
+
+9. 其他系统
+
+· 小猫：17-20点在酒馆出现，可互动增加好感，收养后出现在家中
+· 书籍系统（已简化）：白鸦书屋买书，家中阅读，增加知识经验
+· 调酒笔记：小奥办公室可读，读完增加魅力，可收藏
+
+---
+
+第二部分：Godot开发详细计划
+
+一、前期准备
+
+1. 安装Godot 4.2（稳定版）
+   · 下载地址：https://godotengine.org/download
+   · 创建2D项目，命名“YouL”
+2. 学习资源（推荐）
+   · 官方“Your First 2D Game”教程
+   · GDQuest 的免费入门课程
+   · Godot 文档（重点：GDScript、UI节点、资源系统）
+3. 项目结构
+   ```
+   res://
+   ├── scenes/          # 场景文件（.tscn）
+   ├── scripts/         # 脚本文件（.gd）
+   ├── resources/       # 资源文件（.tres/.res）
+   ├── data/            # JSON数据（对话、事件等）
+   └── assets/          # 图片、字体等
+   ```
+
+二、分阶段开发任务
+
+阶段一：基础框架（第1周）
+
+目标：搭建项目骨架，实现时间系统、主角属性、侧边栏显示、简单打工
+
+任务 技术要点 产出
+1. 创建GameManager单例 Autoload脚本，全局访问 所有场景共享数据
+2. 定义PlayerData资源 继承Resource，存储五维、金钱、时间 可保存/加载
+3. 时间系统 实现add_minutes()，处理进位 时间显示和推进
+4. 侧边栏UI Control + Label/Button，布局锚点 显示金币、时间、五维
+5. 打工按钮 Button信号连接GameManager.work() 增加金币+50，时间+60
+
+代码示例（部分）：
+
+```gdscript
+# GameManager.gd (autoload)
+extends Node
+
+var player_data: PlayerData
+
+func _ready():
+    load_game()
+    
+func work():
+    player_data.gold += 50
+    add_minutes(60)
+    save_game()
+    
+func add_minutes(minutes):
+    player_data.minute += minutes
+    while player_data.minute >= 60:
+        player_data.minute -= 60
+        player_data.hour += 1
+        if player_data.hour >= 24:
+            player_data.hour -= 24
+            player_data.day += 1
+            if player_data.day == 8:
+                player_data.day = 1
+    update_time_display()
+```
+
+阶段二：角色与好感度（第2-3周）
+
+目标：实现莱德、K、小奥的好感度系统，基础互动
+
+任务 技术要点 产出
+1. 定义CharacterData资源 属性：name, affection, level, 技能等 每个角色独立数据
+2. 实现好感度增加/升级 函数 add_affection(amount)，检查升级 升级时触发信号
+3. 十字路口偶遇莱德 根据时间段显示不同描述，生成互动按钮 动态场景内容
+4. 莱德互动界面 聊天、吃饭、散步、送礼选项 不同选项增加不同好感
+5. K、小奥类似互动 复用CharacterData 酒馆、妖精的邀请场景
+
+技术要点：
+
+· 使用 signal 通知UI更新好感度显示
+· 用 Control 的 visible 属性切换互动选项
+· 将互动文本放在JSON中，便于修改
+
+阶段三：职业与打工（第3-4周）
+
+目标：实现5种职业的打工、经验、升级、随机事件
+
+任务 技术要点 产出
+1. 定义JobData资源 属性：name, exp, level, wage, stat 每种职业一个实例
+2. 打工函数 增加金币、经验，推进时间，检查升级 通用打工逻辑
+3. 职业升级 经验满100升级，加属性、加工资 触发生活等级经验
+4. 随机事件池 每个职业一个数组，打工时随机触发 简单文本事件
+5. 莱德参与打工 莱德获得独立经验和工资 调用莱德的职业数据
+
+代码示例（随机事件）：
+
+```gdscript
+# 在打工函数中
+var event_pool = {
+    "waiter": ["一位常客认出了你，多给了小费。", "客人嫌你上菜慢，但没发脾气。"],
+    "cleric": ["一位富商捐了一大笔钱，分给你一些。", "一个醉汉闯进教堂，你劝走了他。"]
+}
+var event_text = event_pool[job][randi() % event_pool[job].size()]
+```
+
+阶段四：租房与地点场景（第4-5周）
+
+目标：完成所有地点的场景搭建与基础互动
+
+任务 技术要点 产出
+1. 使用Panel切换地点 每个地点一个Panel，通过按钮显示/隐藏 无需加载场景
+2. 租房系统 每周一检查房租，钱不够宽限3天，逾期被赶出 帐篷生活场景
+3. 帐篷场景 显示欠款、与莱德互动、凑钱回家 替代“家”场景
+4. 所有地点基本描述 从Twine搬运文案，用RichTextLabel显示 基础交互
+
+阶段五：对话与事件系统（第5-6周）
+
+目标：实现可配置的对话系统，支持分支和变量条件
+
+任务 技术要点 产出
+1. 引入Dialogic插件 或自己写简单对话管理器 可视化编辑对话树
+2. 移植主要对话 偶遇、聊天、约会、晚宴等 对话文件（.json）
+3. 话题系统 记录最近话题，聊天时可选择 动态话题列表
+4. 晚宴简化版 随机主题、服装选择、事件选项 复用对话系统
+
+阶段六：战斗系统（第6-7周）
+
+目标：实现回合制战斗，与养成系统联动
+
+任务 技术要点 产出
+1. 设计战斗场景 UI布局：玩家状态、敌人状态、技能按钮 独立战斗场景
+2. 定义EnemyData资源 属性：hp, power, exp, gold 多种敌人
+3. 战斗管理器 控制回合顺序、伤害计算 BattleManager脚本
+4. 伤害公式 融入力量、灵感等属性 与养成系统联动
+5. 战斗后结算 增加经验、金币、好感度 返回原场景
+
+阶段七：测试与打磨（第7-8周）
+
+目标：全面测试、优化、存档、发布
+
+任务 技术要点 产出
+1. 存档/读档 使用ResourceSaver/ResourceLoader或JSON 保存所有游戏数据
+2. 整体测试 按照游戏流程完整测试 修复所有bug
+3. 性能优化 减少不必要的节点、使用对象池 流畅运行
+4. 打包发布 导出为Windows、Linux、Web等 可执行文件
+
+---
+
+三、注意事项与技巧
+
+数据与逻辑分离：所有游戏数据（角色属性、职业数据、对话文本）尽量放在Resource
+
+
+悠L游戏系统 Godot 实现指南
+
+本文档用 Godot 开发者能理解的语言，详细说明如何将 Twine 版本的游戏系统移植到 Godot 中。我们将采用 Godot 的最佳实践：使用 Resource 存储数据、Control 节点搭建 UI、信号 解耦逻辑、场景树 管理状态。
+
+---
+
+一、总体架构
+
+1. 数据层
+
+所有游戏数据都存放在 Resource 或 JSON 文件中，以便于保存/加载和修改。主要资源类型：
+
+· PlayerData（主角属性、金钱、时间）
+· CharacterData（莱德、K、小奥的好感度、等级、技能）
+· JobData（每种职业的工资、经验、升级奖励）
+· LocationData（每个地点的描述、可用互动）
+· EventData（打工随机事件、晚宴事件）
+
+2. 逻辑层
+
+核心逻辑由 Autoload 单例 管理：
+
+· GameManager：全局游戏状态（时间、金钱、场景切换）
+· DataManager：加载/保存所有数据
+· UIManager：更新侧边栏、显示通知
+
+3. 表现层
+
+每个地点是一个 Panel 或 Scene，包含：
+
+· 描述文本（RichTextLabel）
+· 互动按钮（Button）
+· 切换地点的导航按钮
+
+所有 UI 通过信号监听数据变化，自动刷新。
+
+---
+
+二、核心系统实现逻辑
+
+1. 时间系统
+
+数据结构（PlayerData）：
+
+```gdscript
+extends Resource
+class_name PlayerData
+var year: int = 499
+var month: int = 3
+var day: int = 1
+var hour: int = 8
+var minute: int = 0
+```
+
+逻辑：
+
+· GameManager 提供一个 add_minutes(minutes) 方法，增加分钟，自动处理进位（分钟→小时→天）。
+· 每次行动（打工、移动、聊天）后调用此方法。
+· 跨天时（day 变化）检查是否需要触发事件（如周一收房租）。
+· 通过信号 time_changed 通知 UI 更新时间显示。
+
+Godot 实现要点：
+
+· 使用 @onready var player_data: PlayerData = preload("res://resources/player_data.tres") 加载资源。
+· 修改数据后调用 save_game()。
+
+---
+
+2. 主角与角色数据
+
+数据结构（PlayerData 与 CharacterData）：
+
+```gdscript
+# PlayerData 扩展
+var LL: int = 1   # 力量
+var LG: int = 1   # 灵感
+var ML: int = 3   # 魅力
+var NL: int = 2   # 耐力
+var JQ: int = 1   # 技巧
+var attr_points: int = 0   # 可分配属性点
+var gold: int = 0
+
+# CharacterData
+extends Resource
+class_name CharacterData
+@export var name: String
+@export var affection: int = 0
+@export var level: int = 1
+@export var skill_active: bool = false
+@export var skill_bonus: int = 0
+
+signal affection_changed
+signal level_up
+```
+
+逻辑：
+
+· 每个角色（莱德、K、小奥）有一个 CharacterData 实例。
+· 互动时调用 add_affection(amount)，内部检查是否升级。
+· 升级时触发 level_up 信号，GameManager 接收后更新角色属性，并记录日志、显示通知。
+· 主角属性修改统一通过 mod_stat(stat_name, delta) 方法，确保边界检查。
+
+Godot 实现要点：
+
+· 使用 @export 在 Inspector 中方便编辑。
+· 信号连接：character.level_up.connect(_on_character_level_up)。
+
+---
+
+3. 好感度系统
+
+逻辑：
+
+· 每个角色的好感度阈值：100（莱德、K）或 50（小奥）。
+· 升级时奖励：莱德/K 五维各 +1；小奥解锁技能（打工工资 +5% 或 +10%）。
+· 互动选项（聊天、吃饭、送礼、约会）调用 add_affection(amount)，amount 根据选项不同（如聊天+5，吃饭+15）。
+· 同时增加日志记录。
+
+Godot 实现：
+
+```gdscript
+func add_affection(amount):
+    affection += amount
+    var new_level = affection / 100 + 1
+    if new_level > level:
+        level = new_level
+        level_up.emit()
+```
+
+---
+
+4. 职业与打工系统
+
+数据结构（JobData）：
+
+```gdscript
+extends Resource
+class_name JobData
+@export var job_name: String
+@export var exp: int = 0
+@export var level: int = 1
+@export var wage: int = 50
+@export var primary_stat: String = "LL"  # 升级增加的属性
+@export var wage_increment: int = 10    # 升级增加工资
+@export var exp_per_work: int = 20
+```
+
+逻辑：
+
+· 每个职业（服务员、教士、铁匠、杂工、侍从）有一个 JobData。
+· 打工按钮调用 work()，增加金币、职业经验，推进时间。
+· 经验满 100 升一级：增加对应属性、加工资，并增加 50 点生活经验。
+· 生活经验满 150 升一级，奖励 2 个属性点。
+· 随机事件：打工时有概率触发，从事件池中随机选择一条文本，若有选项则显示对话框。
+
+Godot 实现：
+
+```gdscript
+func work():
+    var gold_gain = wage
+    if GameManager.oamel_skill_active:
+        gold_gain = int(gold_gain * (1 + GameManager.oamel_skill_bonus / 100.0))
+    GameManager.gold += gold_gain
+    add_exp(exp_per_work)
+    GameManager.add_minutes(60)
+    if randf() < 0.8:
+        trigger_random_event()
+```
+
+---
+
+5. 租房系统
+
+逻辑：
+
+· 每周一（day == 1）在 GameManager 中检查是否已付租。
+· 若未付租，且主角在家，显示房东上门事件；若不在家，门口留信封。
+· 若钱不够，给予 3 天宽限期；第 4 天仍未付租，触发被赶出（evicted = true）。
+· 被赶出后，current_location 变为“帐篷”，家中所有物品不可用。
+· 在帐篷场景中，可以凑钱还租（还清后重置状态）。
+
+Godot 实现：
+
+· 在 add_minutes 中检查跨天，若新的一天是周一，触发 check_rent()。
+· 使用一个 GameState 资源存储 evicted, owe_rent, rent_due_date。
+· 地点切换时，根据 evicted 决定显示“家”还是“帐篷”。
+
+---
+
+6. 地点与场景切换
+
+方案：使用 Panel 堆叠 或 场景切换。
+
+推荐：使用 Panel 堆叠（一个主场景，多个 Panel 代表不同地点）：
+
+· 主场景 Main.tscn 包含侧边栏（固定）和一个 ContentPanel 容器。
+· 每个地点是一个独立 Panel，放在 ContentPanel 中，通过 visible 切换。
+· 导航按钮调用 UIManager.switch_location(location_id) 控制显示。
+
+优点：无需加载新场景，切换迅速，侧边栏一直存在。
+
+数据结构（LocationData）：
+
+```gdscript
+extends Resource
+class_name LocationData
+@export var name: String
+@export var description: String
+@export var interactions: Array[Interaction]   # 自定义 Interaction 资源
+```
+
+---
+
+7. 对话与事件系统
+
+推荐：使用 Dialogic 插件 或自己写一个简单的对话管理器。
+
+自定义对话管理器：
+
+· 将对话数据存为 JSON 或 Resource，格式如下：
+  ```json
+  {
+    "nodes": [
+      {"id": "start", "text": "“你好。”", "options": [
+        {"text": "聊天", "next": "chat", "affection": 5},
+        {"text": "离开", "next": "end"}
+      ]},
+      {"id": "chat", "text": "“最近怎么样？”", "options": [...]}
+    ]
+  }
+  ```
+· 对话时，加载当前节点，显示文本和选项按钮。
+· 选项可修改游戏变量（好感度、金钱），然后跳转到下一节点。
+· 对话结束触发信号，返回原场景。
+
+Godot 实现要点：
+
+· 对话界面作为独立场景，弹出时暂停游戏。
+· 使用 ResourceLoader 加载对话资源。
+· 通过 call 方法执行选项的副作用。
+
+---
+
+8. 战斗系统
+
+设计：回合制，独立场景。
+
+数据结构：
+
+```gdscript
+extends Resource
+class_name EnemyData
+@export var name: String
+@export var hp: int
+@export var power: int
+@export var exp_reward: int
+@export var gold_reward: int
+@export var skills: Array[String]
+```
+
+战斗管理器：
+
+· 战斗开始前，将主角属性（力量、灵感等）转换为战斗参数。
+· 回合制循环：玩家选择技能 → 伤害计算 → 敌人行动 → 循环。
+· 伤害公式示例：damage = max(1, (player_power + player_LL) - enemy_defense)
+· 战斗胜利后，增加主角经验、金币，可能影响好感度。
+
+Godot 实现：
+
+· 使用 Control 布局战斗界面，Button 显示技能。
+· 战斗管理器脚本控制回合，用 yield 等待玩家选择。
+
+---
+
+9. 存档系统
+
+方法：使用 ResourceSaver 和 ResourceLoader 保存/加载所有 Resource。
+
+实现：
+
+```gdscript
+func save_game():
+    ResourceSaver.save(player_data, "user://player_data.tres")
+    ResourceSaver.save(character_data, "user://characters.tres")
+    # 也可保存为 JSON 便于调试
+```
+
+注意：Resource 需要先 duplicate() 再修改，避免引用同一实例。
+
+---
+
+三、节点组织建议（场景树结构）
+
+```
+Main (Node2D)
+├── CanvasLayer (UI层)
+│   ├── Sidebar (Control) - 固定侧边栏
+│   │   ├── GoldLabel
+│   │   ├── TimeLabel
+│   │   ├── StatLabels
+│   │   └── 快捷按钮（属性分配、背包等）
+│   └── ContentPanel (Control) - 地点内容容器
+│       ├── CrossroadPanel
+│       ├── HomePanel
+│       ├── TavernPanel
+│       ├── ...
+├── DialogPopup (CanvasLayer, 初始不可见) - 对话弹窗
+├── BattleScene (CanvasLayer, 初始不可见) - 战斗场景
+└── GameManager (Node, autoload)
+```
+
+---
+
+四、代码示例（关键部分）
+
+1. GameManager（Autoload）
+
+```gdscript
+extends Node
+
+signal time_changed
+signal gold_changed
+
+var player_data: PlayerData
+var characters: Dictionary  # "LeiDe": CharacterData
+var jobs: Dictionary
+
+func _ready():
+    load_game()
+
+func add_minutes(minutes):
+    player_data.minute += minutes
+    while player_data.minute >= 60:
+        player_data.minute -= 60
+        player_data.hour += 1
+        if player_data.hour >= 24:
+            player_data.hour -= 24
+            player_data.day += 1
+            if player_data.day > 7:
+                player_data.day = 1
+            check_rent()
+    time_changed.emit()
+    save_game()
+
+func add_gold(amount):
+    player_data.gold += amount
+    gold_changed.emit()
+```
+
+2. CharacterData 资源
+
+```gdscript
+extends Resource
+class_name CharacterData
+@export var name: String
+@export var affection: int = 0
+@export var level: int = 1
+@export var skill: bool = false
+@export var skill_bonus: int = 0
+
+signal affection_changed
+signal level_up
+
+func add_affection(amount):
+    affection += amount
+    affection_changed.emit()
+    var new_level = affection / 100 + 1
+    if new_level > level:
+        level = new_level
+        level_up.emit()
+```
+
+3. 打工按钮场景
+
+```gdscript
+extends Button
+@export var job: JobData
+
+func _ready():
+    pressed.connect(_on_pressed)
+
+func _on_pressed():
+    GameManager.add_gold(job.wage)
+    job.add_exp(20)
+    GameManager.add_minutes(60)
+    if randf() < 0.8:
+        trigger_event()
+```
+
+---
+
+五、总结
+
+用 Godot 实现悠L的关键是：
+
+1. 用 Resource 存储所有数据，方便保存和修改。
+2. 用信号解耦，让 UI 自动响应数据变化。
+3. 用 Panel 堆叠代替场景切换，保持侧边栏常驻。
+4. 对话系统可以先用简单 JSON，后期引入 Dialogic 插件。
+5. 战斗系统独立场景，完成后返回原场景，传递结果。
+
+这份指南覆盖了所有核心系统的实现思路。如果你需要具体某个部分的详细代码或节点设置说明，随时告诉我。

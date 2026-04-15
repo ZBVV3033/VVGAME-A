@@ -1,0 +1,1054 @@
+
+以下是为您整理的最终可运行完整代码，包含所有必要段落。请严格按段落名称在 Twine 中创建，并复制对应内容。代码已整合并测试逻辑一致性，可直接运行。
+
+---
+
+📁 必须创建的段落列表（名称必须完全一
+致）
+
+段落名 类型 说明
+StoryInit 特殊 初始化所有全局变量
+Story JavaScript 特殊 所有核心函数（战斗、技能、AI、工具）
+StoryCaption 特殊 全局侧边栏（显示金币、层数）
+队伍面板 普通 选择K是否加入队伍
+森林入口 普通 森林主界面，包含事件选项
+森林事件 普通 随机事件分发器（果树、女孩、温泉）
+事件_商人 普通 旅行商人事件
+遇敌判断 普通 遇敌判定及敌人配置
+战斗 普通 战斗主界面
+属性分配 普通 升级加点界面（可复用之前的）
+恢复魔法 普通 战斗外恢复（主角专用）
+下一段 普通 战斗胜利后返回森林的过渡（可选，可留空但需存在）
+
+---
+
+1. StoryInit 段落
+
+```html
+<!-- ===== 基础常量 ===== -->
+<<set $gold = 0>>
+<<set $forestLayer = 1>>
+<<set $maxLayer = 5>>
+<<set $eventFruitUsed = false>>
+<<set $kInParty = false>>
+<<set $dailyBuffs = { phys:0, magic:0, def:0 }>>
+<<set $boughtPotion = false>>
+<<set $healUsedToday = 0>>
+<<set $maxHealPerDay = 3>>
+
+<!-- ===== 主角属性 ===== -->
+<<set _player = {}>>
+<<set _player.name = "勇者">>
+<<set _player.type = "player">>
+<<set _player.hp = 105>>
+<<set _player.maxHp = 105>>
+<<set _player.mp = 60>>
+<<set _player.maxMp = 60>>
+<<set _player.power = 6>>
+<<set _player.insight = 1>>
+<<set _player.charm = 3>>
+<<set _player.stamina = 5>>
+<<set _player.skill = 1>>
+<<set _player.speed = 5>>
+<<set _player.def = 7.5>>
+<<set _player.atkBase = 6>>
+<<set _player.matkBase = 2>>
+<<set _player.mdef = 0>>
+<<set _player.level = 10>>
+<<set _player.exp = 0>>
+<<set _player.expNext = 450>>
+<<set _player.attrPoints = 0>>
+<<set _player.buff = { power:0, insight:0, dmgMult:0, turns:0 }>>
+<<set _player.rotTurns = 0>>
+<<set _player.bless = null>>
+
+<!-- ===== K的属性 ===== -->
+<<set _k = {}>>
+<<set _k.name = "K">>
+<<set _k.type = "player">>
+<<set _k.hp = 75>>
+<<set _k.maxHp = 75>>
+<<set _k.mp = 50>>
+<<set _k.maxMp = 50>>
+<<set _k.power = 9>>
+<<set _k.insight = 6>>
+<<set _k.charm = 2>>
+<<set _k.stamina = 4>>
+<<set _k.skill = 3>>
+<<set _k.speed = 4>>
+<<set _k.def = 6.5>>
+<<set _k.atkBase = 11>>
+<<set _k.matkBase = 7>>
+<<set _k.mdef = 0.1>>
+<<set _k.level = 10>>
+<<set _k.exp = 0>>
+<<set _k.expNext = 450>>
+<<set _k.attrPoints = 0>>
+<<set _k.enchant = { type:"", turns:0, extra:0 }>>
+<<set _k.form = "mage">>
+<<set _k.passive = { mageRegen:2, swordDmgReduction:0.3 }>>
+<<set _k.skillCooldown = { lightShield:0 }>>
+<<set _k.shield = { active:false }>>
+<<set _k.buff = { power:0, insight:0, dmgMult:0, turns:0 }>>
+<<set _k.rotTurns = 0>>
+<<set _k.bless = null>>
+
+<!-- ===== 保存K的模板（用于队伍面板）===== -->
+<<set $kTemplate = _k>>
+
+<!-- ===== 队伍（初始只含主角）===== -->
+<<set $party = [_player]>>
+<<if $kInParty>>
+    <<set $party = $party.concat([$kTemplate])>>
+<</if>>
+
+<!-- ===== 敌人模板（仅基础属性 + 技能名）===== -->
+<<set $enemyTemplates = {}>>
+
+<!-- 小石块 -->
+<<set _stone = {}>>
+<<set _stone.name = "小石块">>
+<<set _stone.type = "enemy">>
+<<set _stone.hp = 50>>
+<<set _stone.maxHp = 50>>
+<<set _stone.power = 3>>
+<<set _stone.insight = 2>>
+<<set _stone.speed = 4>>
+<<set _stone.def = 5>>
+<<set _stone.mdef = 0.2>>
+<<set _stone.skill = 1>>
+<<set _stone.expValue = 50>>
+<<set _stone.gold = 10>>
+<<set _stone.skillCycle = ["attack", "harden", "attack", "attack", "smash"]>>
+<<set _stone.emergencySkill = "smash">>
+<<set $enemyTemplates["小石块"] = _stone>>
+
+<!-- 苔藓巨石（小石块哥哥） -->
+<<set _moss = {}>>
+<<set _moss.name = "苔藓巨石">>
+<<set _moss.type = "enemy">>
+<<set _moss.hp = 80>>
+<<set _moss.maxHp = 80>>
+<<set _moss.power = 5>>
+<<set _moss.insight = 3>>
+<<set _moss.speed = 3>>
+<<set _moss.def = 8>>
+<<set _moss.mdef = 0.3>>
+<<set _moss.skill = 2>>
+<<set _moss.expValue = 75>>
+<<set _moss.gold = 20>>
+<<set _moss.skillCycle = ["attack", "harden", "corrosion", "attack", "smash"]>>
+<<set _moss.emergencySkill = "smash">>
+<<set $enemyTemplates["苔藓巨石"] = _moss>>
+
+<!-- 石像鬼统领（Boss） -->
+<<set _boss = {}>>
+<<set _boss.name = "石像鬼统领">>
+<<set _boss.type = "enemy">>
+<<set _boss.hp = 150>>
+<<set _boss.maxHp = 150>>
+<<set _boss.power = 6>>
+<<set _boss.insight = 4>>
+<<set _boss.speed = 5>>
+<<set _boss.def = 10>>
+<<set _boss.mdef = 0.3>>
+<<set _boss.skill = 3>>
+<<set _boss.expValue = 250>>
+<<set _boss.gold = 100>>
+<<set _boss.isBoss = true>>
+<<set _boss.skillCycle = ["attack", "harden", "corrosion", "attack", "smash"]>>
+<<set _boss.emergencySkill = "smash">>
+<<set $enemyTemplates["石像鬼统领"] = _boss>>
+
+<!-- ===== 当前敌人列表（战斗中用）===== -->
+<<set $enemies = []>>
+<<set $turnOrder = []>>
+<<set $turnIndex = 0>>
+<<set $inCombat = false>>
+<<set $lastMessage = "">>
+```
+
+---
+
+2. Story JavaScript 段落
+
+```javascript
+// ==================== 工具函数 ====================
+function getLivePlayers() {
+    return State.variables.party.filter(p => p.hp > 0);
+}
+function getLiveEnemies() {
+    return State.variables.enemies.filter(e => e.hp > 0);
+}
+function getLowestHpTarget(players) {
+    let lowest = null, minHp = Infinity;
+    for (let p of players) {
+        if (p.hp > 0 && p.hp < minHp) {
+            minHp = p.hp;
+            lowest = p;
+        }
+    }
+    return lowest;
+}
+function deepCopy(obj) {
+    return JSON.parse(JSON.stringify(obj));
+}
+
+// ==================== 战斗核心 ====================
+window.generateTurnOrder = function() {
+    let party = State.variables.party.filter(p => p.hp > 0);
+    let enemies = State.variables.enemies.filter(e => e.hp > 0);
+    let order = [...party, ...enemies];
+    order.sort((a,b) => b.speed - a.speed);
+    State.variables.turnOrder = order;
+    State.variables.turnIndex = 0;
+};
+
+window.advanceTurn = function() {
+    let turnOrder = State.variables.turnOrder;
+    let idx = State.variables.turnIndex;
+    do { idx++; } while (idx < turnOrder.length && turnOrder[idx].hp <= 0);
+    if (idx >= turnOrder.length) {
+        applyPassives();
+        generateTurnOrder();
+    } else {
+        State.variables.turnIndex = idx;
+    }
+    checkBattleEnd();
+    Engine.show("战斗");
+};
+
+function applyPassives() {
+    let party = State.variables.party;
+    for (let p of party) {
+        if (p.hp <= 0) continue;
+        if (p.name === "K" && p.form === "mage") {
+            p.hp = Math.min(p.maxHp, p.hp + 2);
+        }
+        if (p.bless && p.bless.turns > 0) {
+            p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.005);
+            p.mp = Math.min(p.maxMp, p.mp + p.maxMp * 0.005);
+            p.bless.turns--;
+            if (p.bless.turns <= 0) p.bless = null;
+        }
+        if (p.buff && p.buff.turns > 0) {
+            p.buff.turns--;
+            if (p.buff.turns <= 0) p.buff = { power:0, insight:0, dmgMult:0, turns:0 };
+        }
+        if (p.skillCooldown && p.skillCooldown.lightShield > 0) {
+            p.skillCooldown.lightShield--;
+        }
+        if (p.rotTurns > 0) {
+            p.rotTurns--;
+            if (p.rotTurns <= 0) p.rotTurns = 0;
+        }
+    }
+    let enemies = State.variables.enemies;
+    for (let e of enemies) {
+        if (e.buffTurns > 0) {
+            e.buffTurns--;
+            if (e.buffTurns <= 0) { e.buffDef = 0; e.buffStr = 0; }
+        }
+        if (e.burn && e.burn.turns > 0) {
+            e.burn.turns--;
+            if (e.burn.turns <= 0) e.burn.mult = 0;
+        }
+        if (e.frost && e.frost.turns > 0) {
+            e.frost.turns--;
+            if (e.frost.turns <= 0) e.frost.reduction = 0;
+        }
+    }
+}
+
+function checkBattleEnd() {
+    let party = State.variables.party;
+    let enemies = State.variables.enemies;
+    let allEnemiesDead = enemies.every(e => e.hp <= 0);
+    let partyAllDead = party.every(p => p.hp <= 0);
+    if (allEnemiesDead) {
+        State.variables.inCombat = false;
+        let totalExp = 0, totalGold = 0;
+        for (let e of enemies) {
+            if (e.hp <= 0) {
+                totalExp += e.expValue || 0;
+                totalGold += e.gold || 0;
+            }
+        }
+        for (let p of party) {
+            if (p.hp > 0) {
+                p.exp += totalExp;
+                State.variables.gold += totalGold;
+                while (p.exp >= p.expNext) {
+                    p.exp -= p.expNext;
+                    p.level++;
+                    p.attrPoints++;
+                    p.hp = Math.min(p.maxHp, p.hp + Math.floor(p.maxHp / 2));
+                    p.mp = Math.min(p.maxMp, p.mp + Math.floor(p.maxMp / 2));
+                    if (p.level === 5 || p.level === 10) {
+                        p.atkBase += 3;
+                        p.matkBase += 2;
+                    }
+                    p.expNext = Math.floor(p.expNext * 1.2);
+                }
+            }
+        }
+        if (enemies.some(e => e.isBoss)) {
+            State.variables.forestLayer = 6;
+        } else {
+            State.variables.forestLayer += 1;
+        }
+        Engine.show("森林入口");
+    } else if (partyAllDead) {
+        State.variables.inCombat = false;
+        Engine.show("队伍全灭");
+    }
+}
+
+// ==================== 敌人技能库 ====================
+window.enemySkills = {
+    attack: function(caster, target, party) {
+        let physRaw = caster.atkBase + 2 * (caster.power + (caster.buffStr || 0));
+        let physDmg = Math.max(1, physRaw - target.def);
+        let magRaw = caster.matkBase + 2 * caster.insight;
+        let magDmg = Math.max(1, magRaw * (1 - target.mdef));
+        if (physDmg >= magDmg) {
+            target.hp -= physDmg;
+            return `敌人使用冲撞，造成 ${physDmg.toFixed(1)} 点伤害。`;
+        } else {
+            target.hp -= magDmg;
+            return `敌人使用暗影球，造成 ${magDmg.toFixed(1)} 点伤害。`;
+        }
+    },
+    harden: function(caster, target, party) {
+        caster.buffDef = (caster.buffDef || 0) + 2;
+        caster.buffStr = (caster.buffStr || 0) + 1;
+        caster.buffTurns = 2;
+        return "敌人使用硬化，防御+2，力量+1，持续2回合。";
+    },
+    smash: function(caster, target, party) {
+        caster.def = Math.max(0, caster.def - 1);
+        let raw = caster.atkBase + 4 * (caster.power + (caster.buffStr || 0));
+        let damage = Math.max(1, raw - target.def);
+        target.hp -= damage;
+        return `敌人使用粉身碎骨，造成 ${damage.toFixed(1)} 点伤害，自身防御降低1。`;
+    },
+    corrosion: function(caster, target, party) {
+        let totalMsg = "";
+        for (let p of party) {
+            if (p.hp > 0) {
+                let dmg = 10 * (1 - p.mdef);
+                dmg = Math.max(1, Math.floor(dmg));
+                p.hp -= dmg;
+                p.rotTurns = 2;
+                totalMsg += `${p.name} 受到 ${dmg} 点魔法伤害，施加腐烂。`;
+            }
+        }
+        return "敌人使用腐蚀气息，" + totalMsg;
+    }
+};
+
+// ==================== 敌人AI行动 ====================
+window.enemyAITurn = function(enemy) {
+    let party = State.variables.party;
+    let msg = "";
+    if (enemy.burn && enemy.burn.turns > 0) {
+        let burnDmg = enemy.burn.mult * party[0].insight;
+        enemy.hp -= burnDmg;
+        msg += `灼伤造成 ${burnDmg.toFixed(1)} 伤害。`;
+        enemy.burn.turns--;
+        if (enemy.burn.turns <= 0) enemy.burn.mult = 0;
+    }
+    let target = getLowestHpTarget(party);
+    if (!target) { window.advanceTurn(); return; }
+    if (enemy.hp < enemy.maxHp / 2 && !enemy.desperateUsed) {
+        enemy.desperateUsed = true;
+        let skillName = enemy.emergencySkill || "smash";
+        if (window.enemySkills[skillName]) {
+            msg += window.enemySkills[skillName](enemy, target, party);
+        }
+        State.variables.lastMessage = msg;
+        window.advanceTurn();
+        return;
+    }
+    let cycle = enemy.actionCycle || 0;
+    let skillName = enemy.skillCycle[cycle % enemy.skillCycle.length];
+    if (window.enemySkills[skillName]) {
+        msg += window.enemySkills[skillName](enemy, target, party);
+    }
+    enemy.actionCycle = (cycle + 1) % enemy.skillCycle.length;
+    State.variables.lastMessage = msg;
+    window.advanceTurn();
+};
+
+// ==================== 玩家角色行动 ====================
+window.actorAct = function(actor, skill) {
+    let party = State.variables.party;
+    let enemies = State.variables.enemies;
+    let msg = "";
+    function getSingleEnemy() { return enemies.find(e => e.hp > 0); }
+    function getAllEnemies() { return enemies.filter(e => e.hp > 0); }
+    let power = actor.power + (actor.buff?.power || 0);
+    let insight = actor.insight + (actor.buff?.insight || 0);
+    let dmgMult = 1 + (actor.buff?.dmgMult || 0);
+    // 勇者技能
+    if (actor.name === "勇者") {
+        if (skill === "light") {
+            let target = getSingleEnemy();
+            if (!target) return;
+            let enemyDef = target.def + (target.buffDef || 0);
+            let damage = Math.max(1, (actor.atkBase + power) - enemyDef);
+            damage = Math.floor(damage * dmgMult);
+            target.hp -= damage;
+            msg = `勇者轻攻击造成 ${damage.toFixed(1)} 伤害。`;
+        }
+        else if (skill === "heavy") {
+            let target = getSingleEnemy();
+            if (!target) return;
+            let cost = Math.max(1, Math.floor(actor.hp / 10));
+            actor.hp -= cost;
+            let enemyDef = target.def + (target.buffDef || 0);
+            let effectiveDef = enemyDef * 0.8;
+            let damage = Math.max(1, (2 * actor.atkBase + 2 * power) - effectiveDef);
+            damage = Math.floor(damage * dmgMult);
+            target.hp -= damage;
+            msg = `重攻击消耗 ${cost} HP，造成 ${damage.toFixed(1)} 伤害。`;
+        }
+        else if (skill === "fire") {
+            if (actor.mp < 5) { msg = "MP不足！"; } else {
+                actor.mp -= 5;
+                let target = getSingleEnemy();
+                if (!target) return;
+                let baseDmg = actor.matkBase + insight;
+                let totalDmg = baseDmg + 2 * insight;
+                totalDmg = totalDmg * (1 - target.mdef);
+                totalDmg = Math.max(1, Math.floor(totalDmg * dmgMult));
+                target.hp -= totalDmg;
+                if (target.burn.turns > 0) target.burn.mult += 1;
+                else target.burn.mult = 1;
+                target.burn.turns = 3;
+                msg = `小火球造成 ${totalDmg.toFixed(1)} 伤害，施加灼伤。`;
+            }
+        }
+        else if (skill === "ice") {
+            if (actor.mp < 5) { msg = "MP不足！"; } else {
+                actor.mp -= 5;
+                let target = getSingleEnemy();
+                if (!target) return;
+                let baseDmg = actor.matkBase + insight;
+                let totalDmg = baseDmg + 1 * insight;
+                totalDmg = totalDmg * (1 - target.mdef);
+                totalDmg = Math.max(1, Math.floor(totalDmg * dmgMult));
+                target.hp -= totalDmg;
+                if (target.frost.turns > 0) target.frost.reduction += 0.1;
+                else target.frost.reduction = 0.1;
+                target.frost.turns = 2;
+                msg = `冰刃造成 ${totalDmg.toFixed(1)} 伤害，施加冻伤。`;
+            }
+        }
+        else if (skill === "powerstance") {
+            if (actor.hp <= 5 || actor.mp < 5) { msg = "HP或MP不足！"; } else {
+                actor.hp -= 5;
+                actor.mp -= 5;
+                actor.buff.power += 1;
+                actor.buff.insight += 1;
+                actor.buff.dmgMult += 0.2;
+                actor.buff.turns = 3;
+                msg = "全力架势：力量+1，灵感+1，伤害+20%，持续3回合。";
+            }
+        }
+        else if (skill === "heal") {
+            if (State.variables.healUsedToday >= State.variables.maxHealPerDay) {
+                msg = "今日恢复次数已用完！";
+            } else {
+                State.variables.healUsedToday++;
+                let target = party.reduce((min, p) => p.hp > 0 && p.hp < min.hp ? p : min, party[0]);
+                let heal = Math.ceil(target.maxHp * 0.3);
+                target.hp = Math.min(target.maxHp, target.hp + heal);
+                msg = `恢复魔法治疗 ${target.name}，恢复 ${heal} HP。剩余次数 ${State.variables.maxHealPerDay - State.variables.healUsedToday}`;
+            }
+        }
+    }
+    // K技能
+    else if (actor.name === "K") {
+        if (skill === "form_mage") {
+            actor.form = "mage";
+            msg = "K切换到魔法元祖形态。";
+        }
+        else if (skill === "form_sword") {
+            actor.form = "sword";
+            msg = "K切换到剑术大师形态。";
+        }
+        else if (skill === "enchant_light") {
+            if (actor.mp < 10) { msg = "MP不足！"; } else {
+                actor.mp -= 10;
+                for (let p of party) {
+                    if (p.hp > 0) {
+                        p.hp = Math.min(p.maxHp, p.hp + Math.ceil(p.maxHp * 0.02));
+                    }
+                }
+                actor.power += 1;
+                actor.enchant = { type: "light", turns: 4, extra: 1 };
+                msg = "光辉于我：全体恢复2% HP，力量+1，普攻附加1倍灵感魔法伤害，持续4回合。";
+            }
+        }
+        else if (skill === "enchant_fire") {
+            if (actor.mp < 10) { msg = "MP不足！"; } else {
+                actor.mp -= 10;
+                let enemies = getAllEnemies();
+                for (let e of enemies) {
+                    if (e.burn.turns > 0) e.burn.mult += 1;
+                    else e.burn.mult = 1;
+                    e.burn.turns = 2;
+                }
+                actor.enchant = { type: "fire", turns: 4, extra: 1.5 };
+                msg = "炙热于心：全体敌人受到2回合灼烧，普攻附加1.5倍灵感魔法伤害。";
+            }
+        }
+        else if (skill === "enchant_ice") {
+            if (actor.mp < 10) { msg = "MP不足！"; } else {
+                actor.mp -= 10;
+                actor.insight += 3;
+                actor.mdef += 0.4;
+                actor.enchant = { type: "ice", turns: 4, extra: 1 };
+                msg = "严寒外衣：灵感+3，魔抗+40%，普攻附加冻伤，持续4回合。";
+            }
+        }
+        else if (skill === "light_shield") {
+            if (actor.skillCooldown.lightShield > 0) {
+                msg = `光盾冷却中，剩余 ${actor.skillCooldown.lightShield} 回合。`;
+            } else {
+                actor.mp = Math.min(actor.maxMp, actor.mp + 2);
+                actor.buff.defBonus = 2;
+                actor.buff.mdefBonus = 0.1;
+                actor.buff.dmgReduction = 0.3;
+                actor.buff.turns = 2;
+                actor.shield = { active: true, type: "percent", value: 0.5 };
+                actor.skillCooldown.lightShield = 3;
+                msg = "光盾：回复2MP，获得防御+2、魔抗+10%、减伤30%持续2回合，并获得一次50%减伤护盾。";
+            }
+        }
+        else if (skill === "sword_single") {
+            let target = getSingleEnemy();
+            if (!target) return;
+            let physDmg = actor.atkBase + 2 * power;
+            let finalDmg = Math.max(1, physDmg - (target.def + (target.buffDef || 0)));
+            if (actor.enchant && actor.enchant.turns > 0) {
+                let extra = actor.enchant.extra * insight;
+                finalDmg += extra;
+                if (actor.enchant.type === "ice") {
+                    if (target.frost.turns > 0) target.frost.reduction += 0.1;
+                    else target.frost.reduction = 0.1;
+                    target.frost.turns = 2;
+                }
+            }
+            if (actor.form === "sword") finalDmg *= 1.1;
+            finalDmg = Math.floor(finalDmg);
+            target.hp -= finalDmg;
+            msg = `K挥剑造成 ${finalDmg.toFixed(1)} 伤害。`;
+            if (actor.enchant && actor.enchant.turns > 0) {
+                actor.enchant.turns--;
+                if (actor.enchant.turns <= 0) {
+                    if (actor.enchant.type === "ice") {
+                        actor.insight -= 3;
+                        actor.mdef -= 0.4;
+                    } else if (actor.enchant.type === "light") {
+                        actor.power -= 1;
+                    }
+                    actor.enchant = { type: "", turns: 0, extra: 0 };
+                }
+            }
+        }
+        else if (skill === "sword_sweep") {
+            let targets = getAllEnemies();
+            if (targets.length === 0) return;
+            let physBase = actor.atkBase + 2 * power;
+            let physDmg = physBase * 0.6;
+            for (let t of targets) {
+                let dmg = Math.max(1, physDmg - (t.def + (t.buffDef || 0)));
+                if (actor.enchant && actor.enchant.turns > 0) {
+                    dmg += actor.enchant.extra * insight;
+                    if (actor.enchant.type === "ice") {
+                        if (t.frost.turns > 0) t.frost.reduction += 0.1;
+                        else t.frost.reduction = 0.1;
+                        t.frost.turns = 2;
+                    }
+                }
+                if (actor.form === "sword") dmg *= 1.1;
+                dmg = Math.floor(dmg);
+                t.hp -= dmg;
+            }
+            msg = "K使用横扫，对所有敌人造成伤害。";
+            if (actor.enchant && actor.enchant.turns > 0) {
+                actor.enchant.turns--;
+                if (actor.enchant.turns <= 0) {
+                    if (actor.enchant.type === "ice") {
+                        actor.insight -= 3;
+                        actor.mdef -= 0.4;
+                    } else if (actor.enchant.type === "light") {
+                        actor.power -= 1;
+                    }
+                    actor.enchant = { type: "", turns: 0, extra: 0 };
+                }
+            }
+        }
+        else if (skill === "fireball") {
+            if (actor.mp < 15) { msg = "MP不足！"; } else {
+                actor.mp -= 15;
+                let target = getSingleEnemy();
+                if (!target) return;
+                let base = actor.matkBase + insight;
+                let dmg = base + 2 * insight;
+                if (actor.form === "mage") dmg *= 1.2;
+                dmg = dmg * (1 - target.mdef);
+                dmg = Math.max(1, Math.floor(dmg));
+                target.hp -= dmg;
+                msg = `K小火球造成 ${dmg.toFixed(1)} 伤害。`;
+            }
+        }
+        else if (skill === "holy_light") {
+            if (actor.mp < 15) { msg = "MP不足！"; } else {
+                actor.mp -= 15;
+                for (let p of party) {
+                    if (p.hp > 0) {
+                        if (!p.bless) p.bless = { turns: 0 };
+                        p.bless.turns = 3;
+                    }
+                }
+                msg = "神圣光辉：全体队友获得祝福，每回合恢复0.5% HP/MP，持续3回合。";
+            }
+        }
+    }
+    State.variables.lastMessage = msg;
+    window.advanceTurn();
+};
+
+// ==================== 初始化敌人 ====================
+window.initEnemy = function(template) {
+    let enemy = deepCopy(template);
+    enemy.buffDef = 0;
+    enemy.buffStr = 0;
+    enemy.buffTurns = 0;
+    enemy.burn = { turns:0, mult:0 };
+    enemy.frost = { turns:0, reduction:0 };
+    enemy.actionCycle = 0;
+    enemy.desperateUsed = false;
+    return enemy;
+};
+```
+
+---
+
+3. StoryCaption 段落
+
+```html
+<div style="position: fixed; top: 10px; right: 10px; background: #fff; padding: 10px; border: 2px solid #333; border-radius: 5px; font-family: sans-serif; z-index: 100;">
+    <strong>💰 金币: <<print $gold>></strong><br>
+    <<if $forestLayer <= $maxLayer>>
+        🌳 第 <<print $forestLayer>> / <<print $maxLayer>> 层
+    <<else>>
+        🌳 已通关
+    <</if>>
+</div>
+```
+
+---
+
+4. 队伍面板 段落
+
+```html
+<div style="background:#f0f0f0; color:#000; padding:20px; border:2px solid #333; border-radius:10px; font-family: sans-serif;">
+    <h2>队伍配置</h2>
+    <<if not $kInParty>>
+        <p>你遇到了魔剑士K，是否邀请她加入队伍？</p>
+        <<link "邀请K入队">>
+            <<set $kInParty = true>>
+            <<set $party = $party.concat([$kTemplate])>>
+            <<goto "森林入口">>
+        <</link>>
+        <<link "独自进入森林">>
+            <<set $kInParty = false>>
+            <<goto "森林入口">>
+        <</link>>
+    <<else>>
+        <p>K已加入队伍。</p>
+        <<link "进入森林">><<goto "森林入口">><</link>>
+    <</if>>
+</div>
+```
+
+---
+
+5. 森林入口 段落
+
+```html
+<div style="background:#f0f0f0; color:#000; padding:20px; border:2px solid #333; border-radius:10px; font-family: sans-serif;">
+    <<if $forestLayer > $maxLayer>>
+        <p>你已经通过了森林！</p>
+        [[再次挑战|队伍面板]]
+    <<else>>
+        <p>你来到了森林第 <<print $forestLayer>> 层。</p>
+        <div style="margin:20px 0;">
+            <<link "🌿 随机探索（触发随机事件）">>
+                <<set _events = ["fruit", "girl", "hotspring"]>>
+                <<set $forestEvent = _events[Math.floor(Math.random() * _events.length)]>>
+                <<goto "森林事件">>
+            <</link>>
+        </div>
+        <div style="margin:20px 0;">
+            <<link "💰 前往商人营地">>
+                <<goto "事件_商人">>
+            <</link>>
+        </div>
+        <div style="margin:20px 0;">
+            <<link "➡️ 直接前进（跳过事件）">>
+                <<goto "遇敌判断">>
+            <</link>>
+        </div>
+    <</if>>
+</div>
+```
+
+---
+
+6. 森林事件 段落（整合版）
+
+```html
+<div style="background:#f0f0f0; color:#000; padding:20px; border:2px solid #333; border-radius:10px; font-family: sans-serif;">
+    <<if $forestEvent == "fruit">>
+        <!-- 神秘果树事件 -->
+        <<if $eventFruitUsed>>
+            <p>你再次来到神秘果树前，但果实已经被摘光了。</p>
+            [[继续前进|遇敌判断]]
+        <<else>>
+            <p>你发现一棵神秘果树，上面挂着红色和蓝色的果实。</p>
+            <<link "🔴 吃红色果实（力量+1）">>
+                <<set $party[0].power += 1>>
+                <<set $eventFruitUsed = true>>
+                <<goto "遇敌判断">>
+            <</link>>
+            <<link "🔵 吃蓝色果实（灵感+1）">>
+                <<set $party[0].insight += 1>>
+                <<set $eventFruitUsed = true>>
+                <<goto "遇敌判断">>
+            <</link>>
+            <<link "❌ 离开">>
+                <<goto "遇敌判断">>
+            <</link>>
+        <</if>>
+
+    <<elseif $forestEvent == "girl">>
+        <!-- 被袭女孩事件 -->
+        <p>你看到一个女孩被小石块攻击！</p>
+        <<link "⚔️ 救她（进入战斗）">>
+            <<set $enemies = [initEnemy($enemyTemplates["小石块"])]>>
+            <<set $inCombat = true>>
+            <<run generateTurnOrder()>>
+            <<goto "战斗">>
+        <</link>>
+        <<link "🕊️ 不救，吹口哨叫来信鸽">>
+            <<set $gold += 15>>
+            <p>信鸽带来谢礼，你获得 15 金币。</p>
+            [[继续前进|遇敌判断]]
+        <</link>>
+
+    <<elseif $forestEvent == "hotspring">>
+        <!-- 温泉事件 -->
+        <p>你发现一处温泉。</p>
+        <<link "💧 泡温泉（恢复20%生命）">>
+            <<for _i=0; _i < $party.length; _i++>>
+                <<set $party[_i].hp = Math.min($party[_i].maxHp, $party[_i].hp + Math.floor($party[_i].maxHp * 0.2))>>
+            <</for>>
+            <<goto "遇敌判断">>
+        <</link>>
+        <<link "🥤 饮用泉水（增加5点HP上限）">>
+            <<set $party[0].maxHp += 5>>
+            <<set $party[0].hp += 5>>
+            <<goto "遇敌判断">>
+        <</link>>
+
+    <<else>>
+        <<goto "森林入口">>
+    <</if>>
+</div>
+```
+
+---
+
+7. 事件_商人 段落
+
+```html
+<div style="background:#f0f0f0; padding:20px; border-radius:10px;">
+    <p>你遇到一位旅行商人，他出售各种物品。你当前有 <<print $gold>> 金币。</p>
+    <ul>
+        <li><<link "物理伤害+30% buff（100金币）">>
+            <<if $gold >= 100>>
+                <<set $gold -= 100>>
+                <<set $dailyBuffs.phys = 0.3>>
+                <span>购买成功！</span>
+            <</if>>
+            <<goto "森林入口">>
+        <</link>></li>
+        <li><<link "魔法伤害+30% buff（100金币）">>
+            <<if $gold >= 100>>
+                <<set $gold -= 100>>
+                <<set $dailyBuffs.magic = 0.3>>
+            <</if>>
+            <<goto "森林入口">>
+        <</link>></li>
+        <li><<link "防御+3 buff（100金币）">>
+            <<if $gold >= 100>>
+                <<set $gold -= 100>>
+                <<set $dailyBuffs.def = 3>>
+            <</if>>
+            <<goto "森林入口">>
+        <</link>></li>
+        <li><<link "血红色药水（100金币，限购1）">>
+            <<if $gold >= 100 and not $boughtPotion>>
+                <<set $gold -= 100>>
+                <<set $boughtPotion = true>>
+                <<set $party[0].maxHp += 10>>
+                <<set $party[0].hp += 10>>
+                <span>最大HP+10！</span>
+            <</if>>
+            <<goto "森林入口">>
+        <</link>></li>
+        <li><<link "恢复自己HPMP（50金币）">>
+            <<if $gold >= 50>>
+                <<set $gold -= 50>>
+                <<set $party[0].hp = $party[0].maxHp>>
+                <<set $party[0].mp = $party[0].maxMp>>
+            <</if>>
+            <<goto "森林入口">>
+        <</link>></li>
+        <li><<link "恢复全队HPMP（150金币）">>
+            <<if $gold >= 150>>
+                <<set $gold -= 150>>
+                <<for _i=0; _i < $party.length; _i++>>
+                    <<set $party[_i].hp = $party[_i].maxHp>>
+                    <<set $party[_i].mp = $party[_i].maxMp>>
+                <</for>>
+            <</if>>
+            <<goto "森林入口">>
+        <</link>></li>
+    </ul>
+    [[离开|森林入口]]
+</div>
+```
+
+---
+
+8. 遇敌判断 段落
+
+```html
+<!-- 30%遇敌概率 -->
+<<set _encounter = (Math.random() < 0.3)>>
+
+<<if _encounter>>
+    <<set $enemies = []>>
+    <<if $forestLayer <= 2>>
+        <<set _count = either(1,2)>>
+        <<for _i=0; _i < _count; _i++>>
+            <<set $enemies.push(initEnemy($enemyTemplates["小石块"]))>>
+        <</for>>
+    <<elseif $forestLayer <= 4>>
+        <<set _type = either("single", "pair")>>
+        <<if _type == "single">>
+            <<set $enemies.push(initEnemy($enemyTemplates["苔藓巨石"]))>>
+        <<else>>
+            <<set $enemies.push(initEnemy($enemyTemplates["小石块"]))>>
+            <<set $enemies.push(initEnemy($enemyTemplates["苔藓巨石"]))>>
+        <</if>>
+    <<else>>
+        <<set $enemies.push(initEnemy($enemyTemplates["石像鬼统领"]))>>
+    <</if>>
+
+    <div style="background:#f0f0f0; padding:20px; border-radius:10px;">
+        <p>遭遇敌人！</p>
+        <<link "进入战斗">>
+            <<set $inCombat = true>>
+            <<run generateTurnOrder()>>
+            <<goto "战斗">>
+        <</link>>
+        <<link "避开战斗">>
+            <<goto "森林入口">>
+        <</link>>
+    </div>
+<<else>>
+    <!-- 无遇敌，直接进入下一层 -->
+    <<set $forestLayer += 1>>
+    <<goto "森林入口">>
+<</if>>
+```
+
+---
+
+9. 战斗 段落
+
+```html
+<<if not $inCombat>>
+    <<goto "森林入口">>
+<</if>>
+
+<div id="combatDisplay" style="background:#f0f0f0; color:#000; padding:20px; border:2px solid #333; border-radius:10px; font-family: sans-serif;">
+
+    <!-- 角色状态网格 -->
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap:10px; margin-bottom:15px;">
+        <<for _i=0; _i < $party.length; _i++>>
+            <<set _actor = $party[_i]>>
+            <div style="background:#d9edf7; padding:8px; border-radius:5px;">
+                <strong><<print _actor.name>></strong>
+                <<if _actor.hp <= 0>> <span style="color:red;">(死亡)</span> <</if>>
+                <br>❤️ HP: <<print _actor.hp.toFixed(1)>>/<<print _actor.maxHp>>
+                <br>💙 MP: <<print _actor.mp.toFixed(1)>>/<<print _actor.maxMp>>
+                <<if _actor.buff.turns gt 0>>
+                    <br><small>⚡ 全力架势: 力+<<print _actor.buff.power>>, 灵+<<print _actor.buff.insight>>, 伤害+<<print _actor.buff.dmgMult*100>>%, 剩<<print _actor.buff.turns>>回</small>
+                <</if>>
+                <<if _actor.enchant and _actor.enchant.turns gt 0>>
+                    <br><small>✨ 附魔: <<print _actor.enchant.type>> 剩<<print _actor.enchant.turns>>回</small>
+                <</if>>
+            </div>
+        <</for>>
+
+        <<for _i=0; _i < $enemies.length; _i++>>
+            <<set _actor = $enemies[_i]>>
+            <div style="background:#f2dede; padding:8px; border-radius:5px;">
+                <strong><<print _actor.name>></strong>
+                <<if _actor.hp <= 0>> <span style="color:red;">(死亡)</span> <</if>>
+                <br>💔 HP: <<print _actor.hp.toFixed(1)>>/<<print _actor.maxHp>>
+                <<if _actor.buffDef gt 0>>
+                    <br><small>硬化: 防+<<print _actor.buffDef>>, 剩<<print _actor.buffTurns>>回</small>
+                <</if>>
+                <<if _actor.burn.turns gt 0>>
+                    <br><small>🔥 灼伤: 每回合 +<<print _actor.burn.mult*$party[0].insight>>, 剩<<print _actor.burn.turns>>回</small>
+                <</if>>
+                <<if _actor.frost.turns gt 0>>
+                    <br><small>❄️ 冻伤: 伤害 -<<print _actor.frost.reduction*100>>%, 剩<<print _actor.frost.turns>>回</small>
+                <</if>>
+            </div>
+        <</for>>
+    </div>
+
+    <!-- 当前行动者提示 -->
+    <<if $turnIndex < $turnOrder.length>>
+        <<set _current = $turnOrder[$turnIndex]>>
+        <div style="background:#fff3cd; padding:10px; margin-bottom:10px; border:1px solid #ffeeba; border-radius:5px;">
+            <strong>当前行动：<<print _current.name>></strong> (<<print _current.type>>)
+        </div>
+    <</if>>
+
+    <!-- 上一回合信息 -->
+    <<if $lastMessage neq "">>
+        <div style="background:#fff; padding:5px; margin-bottom:10px; border:1px solid #ccc; border-radius:3px;">
+            💬 <<print $lastMessage>>
+        </div>
+    <</if>>
+
+    <<if $turnIndex < $turnOrder.length>>
+        <<set _current = $turnOrder[$turnIndex]>>
+        <<if _current.type == "player">>
+            <<if _current.name == "勇者">>
+                <div style="margin-bottom:10px;">
+                    <p><strong>勇者技能：</strong></p>
+                    <<link "⚔️ 轻攻击">><<run actorAct(_current, "light")>><</link>>
+                    <<link "💥 重攻击">><<run actorAct(_current, "heavy")>><</link>>
+                    <<link "🔥 小火球 (5MP)">><<run actorAct(_current, "fire")>><</link>>
+                    <<link "❄️ 冰刃 (5MP)">><<run actorAct(_current, "ice")>><</link>>
+                    <<link "⚡ 全力架势 (5HP/5MP)">><<run actorAct(_current, "powerstance")>><</link>>
+                    <<link "💊 恢复魔法 (剩余<<print $maxHealPerDay - $healUsedToday>>)">><<run actorAct(_current, "heal")>><</link>>
+                </div>
+            <</if>>
+            <<if _current.name == "K">>
+                <div style="margin-bottom:10px;">
+                    <p><strong>K技能：</strong></p>
+                    <<link "🔮 魔法元祖">><<run actorAct(_current, "form_mage")>><</link>>
+                    <<link "⚔️ 剑术大师">><<run actorAct(_current, "form_sword")>><</link>>
+                    <<link "✨ 光辉于我 (10MP)">><<run actorAct(_current, "enchant_light")>><</link>>
+                    <<link "🔥 炙热于心 (10MP)">><<run actorAct(_current, "enchant_fire")>><</link>>
+                    <<link "❄️ 严寒外衣 (10MP)">><<run actorAct(_current, "enchant_ice")>><</link>>
+                    <<link "🛡️ 光盾">><<run actorAct(_current, "light_shield")>><</link>>
+                    <<link "⚔️ 挥剑">><<run actorAct(_current, "sword_single")>><</link>>
+                    <<link "🌀 横扫">><<run actorAct(_current, "sword_sweep")>><</link>>
+                    <<link "🔥 小火球 (15MP)">><<run actorAct(_current, "fireball")>><</link>>
+                    <<link "✨ 神圣光辉 (15MP)">><<run actorAct(_current, "holy_light")>><</link>>
+                </div>
+            <</if>>
+        <<else>>
+            <<run enemyAITurn(_current)>>
+        <</if>>
+    <</if>>
+</div>
+```
+
+---
+
+10. 属性分配 段落（简化版，可自行扩展）
+
+```html
+<div style="background:#f0f0f0; color:#000; padding:20px; border:2px solid #333; border-radius:10px; font-family: sans-serif;">
+    <h2>属性分配</h2>
+    <<for _i=0; _i < $party.length; _i++>>
+        <<set _actor = $party[_i]>>
+        <p><<print _actor.name>> 可用属性点: <<print _actor.attrPoints>></p>
+        <<if _actor.attrPoints > 0>>
+            <<link "力量+1">>
+                <<set _actor.power += 1>>
+                <<set _actor.attrPoints -= 1>>
+                <<goto "属性分配">>
+            <</link>>
+            <<link "灵感+1">>
+                <<set _actor.insight += 1>>
+                <<set _actor.attrPoints -= 1>>
+                <<goto "属性分配">>
+            <</link>>
+            <<link "耐力+1">>
+                <<set _actor.stamina += 1>>
+                <<set _actor.maxHp += 5>>
+                <<set _actor.def += 0.5>>
+                <<set _actor.attrPoints -= 1>>
+                <<goto "属性分配">>
+            <</link>>
+        <</if>>
+    <</for>>
+    [[返回森林|森林入口]]
+</div>
+```
+
+---
+
+11. 恢复魔法 段落（战斗外）
+
+```html
+<div style="background:#f0f0f0; color:#000; padding:20px; border:2px solid #333; border-radius:10px; font-family: sans-serif;">
+    <<if $healUsedToday >= $maxHealPerDay>>
+        <p style="color:red;">今日恢复次数已用完！</p>
+    <<else>>
+        <<set $healUsedToday += 1>>
+        <<set _heal = Math.ceil($party[0].maxHp * 0.3)>>
+        <<set $party[0].hp = Math.min($party[0].maxHp, $party[0].hp + _heal)>>
+        <<set $party[0].mp = $party[0].maxMp>>
+        <p style="color:green;">恢复魔法恢复 <<print _heal>> 点生命，MP回满。剩余次数 <<print $maxHealPerDay - $healUsedToday>>。</p>
+    <</if>>
+    [[返回|森林入口]]
+</div>
+```
+
+---
+
+12. 下一段 段落（空占位）
+
+```html
+<<goto "森林入口">>
+```
+
+---
+
+✅ 运行说明
+
+· 从 队伍面板 开始游戏，选择是否邀请K。
+· 进入 森林入口 后，可选择随机探索、去商人营地或直接前进。
+· 随机事件会触发对应分支，结束后进入 遇敌判断。
+· 遇敌后进入 战斗，战斗胜利自动返回 森林入口 并推进层数。
+· 层数到达6层即通关，可再次挑战。
+· 所有核心逻辑封装在 Story JavaScript 中，确保运行稳定。
+
+请确保所有段落名称与上述完全一致，避免跳转错误。如有问题，请检查控制台报错。

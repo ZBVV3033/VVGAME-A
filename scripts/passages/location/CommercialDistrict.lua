@@ -1,0 +1,675 @@
+-- passages/location/CommercialDistrict.lua
+-- Auto-split sub-module, returns installer function
+
+return function(handlers, deps)
+
+local GameState = deps.GameState
+local TimeSystem = deps.TimeSystem
+local NPCSystem = deps.NPCSystem
+local WorkSystem = deps.WorkSystem
+local HomeSystem = deps.HomeSystem
+local MainQuest = deps.MainQuest
+local CommonUtils = deps.CommonUtils
+local PassageDeps = deps.PassageDeps
+local addAffection = deps.addAffection
+local addDateLog = deps.addDateLog
+local doWorkWithEvent = deps.doWorkWithEvent
+local isLeiDeHome = deps.isLeiDeHome
+
+handlers["商业区"] = function(S)
+    if not S.currentArea or S.currentArea == "" then
+        S.currentArea = "square"
+    end
+
+    if S.currentArea == "square" then
+        local sqChoices = {
+            { text = "🍢 逛小吃街", action = function() TimeSystem.addMinutes(1) S.currentArea = "food" return "商业区" end },
+            { text = "🏪 逛商店", action = function() TimeSystem.addMinutes(1) S.currentArea = "shop" return "商业区" end },
+            { text = "🍺 去酒馆「醉鹿」", action = function() TimeSystem.addMinutes(1) S.currentArea = "tavern" return "商业区" end },
+            { text = "⛪ 去教堂", action = function() TimeSystem.addMinutes(1) S.currentArea = "church" return "商业区" end },
+            { text = "⚒️ 去铁匠铺", action = function() TimeSystem.addMinutes(1) S.currentArea = "smithy" return "商业区" end },
+            { text = "🔙 返回十字路口", action = function() TimeSystem.addMinutes(1) S.currentArea = "" return "十字路口" end },
+        }
+        -- ══ 主线任务触发 ══
+        local mqTrigger = MainQuest.getTriggerChoice("商业区")
+        if mqTrigger then table.insert(sqChoices, 1, mqTrigger) end
+        return { text = "商业区\n\n"
+            .. "阳光透过错落的布篷洒下斑驳的光影，空气中弥漫着烤串的油烟和香料的辛辣气息。"
+            .. "叫卖声、讨价还价的争吵、铜币碰撞铜币的脆响——这片街区永远不缺热闹。\n\n"
+            .. "外围是一条烟火气十足的小吃街，里面则是鳞次栉比的商铺和酒馆。", choices = sqChoices }
+
+    elseif S.currentArea == "food" then
+        return {
+            text = "小吃街\n\n"
+                .. "窄窄的巷道两侧挤满了摊位，蒸笼冒出的白烟和炭火的热浪交织在一起。"
+                .. "烤串在铁架上滋滋作响，糖葫芦的红色糖衣在阳光下闪闪发亮，汤面摊的老板一手颠锅一手撒葱花，动作行云流水。"
+                .. "食客们挤在路边的矮凳上，吃得满头大汗。",
+            choices = {
+                { text = "🍢 买一串烤串（10分钟 | 饱食+15，-5金币）", action = function()
+                    if S.money >= 5 then
+                        S.money = S.money - 5
+                        GameState.modStat("satiety", 15)
+                        TimeSystem.addMinutes(10)
+                        local descs = {
+                            "你在一个冒着滚滚浓烟的摊位前停下脚步。摊主是个满脸络腮胡的壮汉，手上翻烤的动作快得像变戏法。"
+                            .. "你递过五枚铜币，他麻利地从铁架上取下一串，刷上秘制酱料，撒了把孜然和粗盐。"
+                            .. "你咬下第一口——外皮焦脆，肉汁在齿间迸裂，带着炭火特有的烟熏香气。"
+                            .. "「好吃吗？」摊主咧嘴一笑，露出一排焦黄的牙，「这可是我祖传的腌料方子。」\n(饱食度+15)",
+                            "小吃街最热闹的永远是街角那家烤串摊。你挤进人群，等了好一会儿才轮到。"
+                            .. "摊主的女儿——一个扎着双辫的小姑娘替你端上一串刚出炉的烤肉，铁签子还烫手。"
+                            .. "你吹了吹，小心翼翼地咬了一口。肉质嫩滑，酱料的甜咸恰到好处，配上微微的辣味，让人忍不住眯起眼。"
+                            .. "吃完最后一块肉，你意犹未尽地舔了舔手指。\n(饱食度+15)",
+                            "「这位客官，来串新出炉的！」一个嗓门洪亮的摊贩朝你招手，铁架上的肉串滋滋冒油。"
+                            .. "你掏出铜币，接过一串冒着热气的烤肉。第一口就让你停不下来——"
+                            .. "外层的焦壳裹着鲜嫩的肉芯，炭火的烟气和香料的辛辣在口腔里交织。"
+                            .. "旁边一个食客看你吃得香，也凑过来要了两串。你们互相点了点头，算是打了个招呼。\n(饱食度+15)",
+                            "你被一阵诱人的肉香吸引到一个不起眼的小摊前。和别家不同，这个摊主是个沉默寡言的老头，"
+                            .. "手法却极其老练——翻烤、刷酱、撒料，一气呵成。你要了一串，咬下去的瞬间便明白了这摊子为什么排队最长。"
+                            .. "肉嫩而不柴，酱香而不腻，连铁签上残留的肉末都让人舍不得浪费。"
+                            .. "你心满意足地擦了擦嘴角的油渍，暗暗记住了这个位置。\n(饱食度+15)",
+                        }
+                        GameState.showNotification(descs[math.random(1, #descs)])
+                    else
+                        GameState.showNotification("金币不足！")
+                    end
+                    return "商业区"
+                end },
+                { text = "🥣 喝一碗热汤（5分钟 | 饱食+10，-3金币）", action = function()
+                    if S.money >= 3 then
+                        S.money = S.money - 3
+                        GameState.modStat("satiety", 10)
+                        TimeSystem.addMinutes(5)
+                        local descs = {
+                            "汤摊的老板娘认出了你，笑盈盈地盛了满满一碗。浓稠的汤底泛着金黄色的油花，"
+                            .. "几片葱花漂在表面，热气裹着鲜香扑面而来。你小口小口地喝着，"
+                            .. "暖流从喉咙一路淌到胃里，浑身上下都舒坦了。碗底还卧着几块软烂的萝卜，入口即化。"
+                            .. "「汤好喝吗？」老板娘一边擦桌子一边问。你用力点了点头。\n(饱食度+10)",
+                            "你在一个冒着腾腾热气的汤摊前坐下，矮凳有些摇晃。"
+                            .. "老板端上一碗热汤——颜色深褐，表面浮着星星点点的油花和切碎的香菜。"
+                            .. "第一口下去，浓郁的骨汤味道充盈口腔，微微的胡椒辛辣从鼻腔窜上来，"
+                            .. "驱散了身上的寒意。你捧着碗，慢慢喝完最后一滴，碗底干干净净。\n(饱食度+10)",
+                            "巷子尽头的汤摊只有三张桌子，却总是坐满了人。你等了一小会儿，"
+                            .. "终于等到一碗刚出锅的热汤。汤色清亮，底下铺着细细的粉丝和豆芽，"
+                            .. "表面点缀着几滴红油。你端起碗边吹边喝，鲜美的滋味一点点化开，"
+                            .. "连指尖都跟着暖了起来。旁边的食客埋头苦吃，谁也没说话，只有稀里呼噜的喝汤声。\n(饱食度+10)",
+                        }
+                        GameState.showNotification(descs[math.random(1, #descs)])
+                    else
+                        GameState.showNotification("金币不足！")
+                    end
+                    return "商业区"
+                end },
+                { text = "🔙 返回广场", action = function() TimeSystem.addMinutes(1) S.currentArea = "square" return "商业区" end },
+            },
+        }
+
+    elseif S.currentArea == "shop" then
+        return {
+            text = "杂货铺\n\n"
+                .. "推开吱呀作响的木门，一股混杂着蜡脂和干草的气味扑面而来。"
+                .. "狭小的店铺里堆得满满当当——蜡烛、绳子、陶罐、针线盒，从地板一路码到天花板。"
+                .. "柜台后的老板娘戴着花镜，正拨弄算盘珠子。",
+            choices = {
+                { text = "🕯️ 买蜡烛（-2金币）", action = function()
+                    if S.money >= 2 then S.money = S.money - 2; S.candles = (S.candles or 0) + 1; TimeSystem.addMinutes(5) end
+                    return "商业区"
+                end },
+                { text = "🔙 返回广场", action = function() TimeSystem.addMinutes(1) S.currentArea = "square" return "商业区" end },
+            },
+        }
+
+    elseif S.currentArea == "tavern" then
+        local text = "酒馆「醉鹿」\n\n"
+            .. "木质的吧台擦得锃亮，壁炉里的火噼啪作响。"
+            .. "K在吧台后优雅地擦拭着酒杯，精灵耳在烛光下泛着柔和的光晕，头顶的光环时隐时现。\n\n"
+            .. "辛奇老板在角落里核对账本，偶尔抬头看一眼。"
+
+        -- 梅菲斯随机事件
+        if math.random(1, 100) <= 20 and S.hour >= 18 and S.hour < 23 then
+            S.metManagerCount = (S.metManagerCount or 0) + 1
+            if S.metManagerCount == 1 then
+                text = text .. "\n\n你在酒馆角落看见梅菲斯独自饮酒，他似乎有些疲惫。看见你，他招手：「过来坐坐？」\n你坐下，他给你倒了一杯麦酒：「妖精的邀请晚上才热闹，我更喜欢这里。清静。」"
+            else
+                text = text .. "\n\n梅菲斯又在老位置喝酒。看见你，他微微抬手示意。"
+                if (S.meifeiAffection or 0) >= 50 then
+                    text = text .. "\n「又来了？」他笑，「今天想听哪个时代的故事？」"
+                elseif (S.meifeiAffection or 0) >= 20 then
+                    text = text .. "\n「最近过得如何？」他问，眼神温和。"
+                else
+                    text = text .. "\n他礼貌地点点头，没有多说的意思。"
+                end
+            end
+        end
+
+        -- 小奥来醉鹿喝酒 (傍晚/夜晚, 15%)
+        if S.metOamelFirst and S.hour >= 19 and S.hour < 23 and math.random(1, 100) <= 15 then
+            local oamelAff = S.oamelAffection or 0
+            if oamelAff >= 50 then
+                text = text .. "\n\n吧台角落，一个红发年轻人正独自喝着威士忌——是奥梅尔。"
+                    .. "他今天没穿那件招牌燕尾服，换了一身低调的深色便装，头发也散了下来。"
+                    .. "\n\n他看见你，难得没有摆出那副似笑非笑的表情，反而招了招手："
+                    .. "「过来坐。」他给你倒了一杯麦酒，自己又抿了一口威士忌。"
+                    .. "\n\n「妖精的邀请那边应酬太多了，有时候就想找个安静的地方坐坐。」"
+                    .. "他望着壁炉里跳动的火焰，难得露出几分疲惫："
+                    .. "「你知道吗，这里的酒反而比我们那边的好喝。不那么……刻意。」"
+                    .. "\n\n辛奇在柜台后面哼了一声，算是默认了这个赞美。"
+                    .. "K低声笑了笑，继续擦杯子。"
+            elseif oamelAff >= 20 then
+                text = text .. "\n\n你注意到角落的雅座上坐着一个熟悉的身影——奥梅尔·罗斯巴特。"
+                    .. "他穿着便装，红发随意地扎在脑后，面前摆着一杯还没怎么动过的酒。"
+                    .. "\n\n他察觉到你的视线，挑了挑眉：「哟，没想到在这种地方遇到你。」"
+                    .. "语气里带着惯常的傲慢，但少了几分刺。"
+                    .. "\n\n「别误会，我不是来这里挑衅的。偶尔换换口味而已。」"
+                    .. "他端起酒杯晃了晃，「K调的酒太花哨了，有时候就想喝杯简单的。」"
+                    .. "\n\n他转头看了看吧台后的K，K正好也看过来，两人交换了一个微妙的眼神。"
+                    .. "奥梅尔率先移开目光，嘴角勾了一下——不知道是笑还是别的什么表情。"
+            else
+                text = text .. "\n\n酒馆门被推开，进来一个红发的年轻人。"
+                    .. "辛奇抬头看了一眼，微微皱眉——这个人的气场和醉鹿的风格格格不入。"
+                    .. "\n\n是奥梅尔·罗斯巴特。他环顾四周，嘴角微微撇了一下，"
+                    .. "显然对这里朴素的装潢不太满意。但他还是坐了下来，用手帕擦了擦桌面。"
+                    .. "\n\n「一杯你们这里最好的酒。」他说，语气里带着一种理所当然的傲慢。"
+                    .. "\n\n辛奇沉默地倒了一杯麦酒推过去。奥梅尔看了一眼，叹了口气，还是端起来喝了。"
+                    .. "\n\n「……比想象中好。」他小声嘀咕了一句，不知道是自言自语还是勉强的夸奖。"
+                    .. "\n\nK在吧台后冲你使了个眼色，那个表情似乎在说：你看，他就是这样。"
+            end
+        end
+
+        -- 阿斯特（罗斯巴特伯爵）来醉鹿偶遇 (夜晚, 10%, Ch3揭秘前)
+        if not S.mq3FatherSecret and S.hour >= 20 and S.hour < 23 and math.random(1, 100) <= 10 then
+            S.rosbatFatherTavernCount = (S.rosbatFatherTavernCount or 0) + 1
+            if S.rosbatFatherTavernCount == 1 then
+                text = text .. "\n\n酒馆门突然被推开，两个身材魁梧的护卫走进来，"
+                    .. "目光锐利地扫视了整个大厅。喧闹的酒馆安静了一瞬。"
+                    .. "\n\n紧接着，一个穿深红色大衣的中年男人走了进来。"
+                    .. "他留着修剪整齐的络腮胡，和奥梅尔一样的红发，但短了许多，"
+                    .. "举手投足间有一种不怒自威的气场。"
+                    .. "辛奇立刻站直了身体，K的笑容也收敛了几分。"
+                    .. "\n\n「一杯'北境之火'。」男人坐在靠窗的位子上，声音低沉而平稳。"
+                    .. "护卫们分站两侧，像两座沉默的铁塔。"
+                    .. "\n\n你悄悄问K这是谁。"
+                    .. "K压低声音：「阿斯特·罗斯巴特，罗斯巴特家的家主。小奥的父亲。」"
+                    .. "\n\n阿斯特喝酒的时候一言不发，目光偶尔扫过酒馆里的每一个人。"
+                    .. "那种目光让人很不自在——像是在衡量每个人的价值。"
+                    .. "他喝完酒，留下一枚金币——大约是酒钱的十倍——然后起身离开了。"
+                    .. "\n\n酒馆里的气氛过了好一会儿才恢复正常。"
+                    .. "辛奇摇了摇头：「大人物。」语气里说不上是敬畏还是感慨。"
+            else
+                text = text .. "\n\n阿斯特又来了。"
+                    .. "这次他只带了一个护卫，坐在角落里，面前放着一杯琥珀色的烈酒。"
+                    .. "\n\n他看起来心事重重，手指无意识地摩挲着酒杯的杯沿。"
+                    .. "偶尔从怀里掏出一封信看了看，眉头紧锁，又迅速塞回去。"
+                if S.mqStage and S.mqStage >= 7 then
+                    text = text .. "\n\n你想起奥梅尔让你调查他父亲行踪的事……"
+                        .. "这个时间，在这种地方——他到底在等谁？"
+                        .. "\n\n阿斯特似乎感觉到了你的目光，抬头看了过来。"
+                        .. "你连忙低下头。那一瞬间的眼神，像一把冰冷的刀。"
+                else
+                    text = text .. "\n\n辛奇在你耳边低声说：「大人物又来了。不知道在盘算什么。」"
+                        .. "\n\n「不过话说回来，」辛奇抹了抹嘴角，「能让罗斯巴特家的家主"
+                        .. "放下身段来我这小破酒馆，说明我这酒确实不错。」"
+                        .. "他难得露出一丝得意的笑容。"
+                end
+            end
+        end
+
+        -- 莱昂哈特·瓦勒姆（诺兰的父亲，退休将军）来醉鹿 (傍晚/夜晚, 8%)
+        if S.hour >= 18 and S.hour < 23 and math.random(1, 100) <= 8 then
+            S.leonhartTavernCount = (S.leonhartTavernCount or 0) + 1
+            if S.leonhartTavernCount == 1 then
+                text = text .. "\n\n酒馆门被轻轻推开，走进来一个金发的中年男人。"
+                    .. "他穿着一件朴素的灰色外套，看起来和这里的普通客人没什么两样。"
+                    .. "但你注意到他的眼睛——一双赤红色的瞳孔，在烛光下像两枚暗红的宝石。"
+                    .. "\n\n辛奇抬头看了一眼，愣了一下，然后以一种你从未见过的恭敬语气说："
+                    .. "「瓦勒姆大人……好久没见您了。」"
+                    .. "\n\n男人微微一笑，选了一个角落的位子坐下来。"
+                    .. "「辛奇，不用那么客气。我已经退了。一杯热红酒就好。」"
+                    .. "\n\n他的声音不大，但有一种让人不自觉安静下来的沉稳。"
+                    .. "K放下手中的酒杯，压低声音跟你说："
+                    .. "「莱昂哈特·瓦勒姆。瓦勒姆家的前当家，当年北境军团的总指挥。"
+                    .. "诺兰的父亲。退休好几年了，平时很少出来。」"
+                    .. "\n\n你偷偷打量他。和阿斯特那种不怒自威的压迫感不同，"
+                    .. "莱昂哈特身上有一种历经沧桑后的平和。"
+                    .. "他端着热红酒小口抿着，目光偶尔望向窗外的夜色，神情淡然。"
+                    .. "\n\n离开时他留下了刚好的酒钱和一枚银币的小费——不多不少，恰到好处。"
+                    .. "辛奇目送他走出门，叹了口气：「大人物退休了也还是大人物。」"
+            else
+                local scenes = {
+                    "\n\n莱昂哈特又来了。还是那个角落的位子，还是一杯热红酒。"
+                        .. "他翻着一本旧书，偶尔抿一口酒。"
+                        .. "K说她以前几乎不来这种地方，退休后反而常来了。"
+                        .. "\n\n「大概是终于有时间做普通人了吧。」K若有所思地说。",
+                    "\n\n莱昂哈特今天来得很晚。他坐下后没有点酒，只要了一杯热茶。"
+                        .. "\n\n辛奇端过去的时候，他正望着窗外出神，金发散在肩头，"
+                        .. "赤红的眼瞳倒映着街灯的光。那一瞬间你忽然意识到——"
+                        .. "这个看起来温和的中年人，曾经指挥过千军万马。"
+                        .. "\n\n他接过茶杯时对辛奇点了点头：「谢谢。」"
+                        .. "简简单单两个字，但语气真诚得不像是客套。",
+                    "\n\n莱昂哈特今天带了一支画笔和一本速写簿。"
+                        .. "他一边喝酒一边随手画着什么。你从吧台的角度瞥了一眼——"
+                        .. "画的是窗外的街景，笔触细腻而老练。"
+                        .. "\n\nK凑过来看了一眼，挑了挑眉：「画得不错。」"
+                        .. "莱昂哈特笑了笑：「年轻时候的爱好，退休后终于有时间捡起来了。」",
+                }
+                text = text .. scenes[math.random(1, #scenes)]
+            end
+        end
+
+        -- 莱昂哈特和阿斯特在酒馆重聚（军校老同学, 夜晚, 5%, 两人都出现过）
+        if S.hour >= 20 and S.hour < 23
+            and (S.leonhartTavernCount or 0) >= 1 and (S.rosbatFatherTavernCount or 0) >= 1
+            and math.random(1, 100) <= 5 then
+            text = text .. "\n\n今晚酒馆里出现了罕见的一幕——莱昂哈特和阿斯特坐在了同一张桌前。"
+                .. "\n\n这两个人的气质截然不同。"
+                .. "莱昂哈特穿着朴素的灰外套，金发松散地搭在肩上，神情从容；"
+                .. "阿斯特穿着深红色的大衣，红发短而整齐，浑身上下散发着一种不可侵犯的威压。"
+                .. "\n\n但他们面对面坐着的时候，空气里的紧张感却奇妙地消散了。"
+                .. "\n\n「你又在画那些乱七八糟的东西？」阿斯特扫了一眼莱昂哈特手边的速写簿。"
+                .. "「比起你那些'季度报表'可有趣多了。」莱昂哈特不慌不忙地回了一句。"
+                .. "\n\n阿斯特哼了一声，端起酒杯。莱昂哈特也端起自己的热红酒。"
+                .. "两人碰了一下杯——动作很随意，像是做过无数次。"
+                .. "\n\nK在你耳边低声说：「军校同学。认识三十多年了。"
+                .. "整个城里大概只有莱昂哈特敢这么和伯爵说话。」"
+                .. "\n\n后来你看见阿斯特难得地笑了——不是那种社交场合的礼貌微笑，"
+                .. "而是一种放松的、毫无防备的笑。只持续了一瞬间，但你确实看到了。"
+        end
+
+        -- 小猫事件
+        if S.hour >= 17 and S.hour < 20 then
+            S.catPresent = true
+            text = text .. "\n\n角落里，一只毛茸茸的小奶猫正蜷在软垫上，偶尔发出细微的呼噜声。"
+        end
+
+        local choices = {}
+
+        -- 工作选项
+        if not S.unlockWaiter then
+            table.insert(choices, { text = "💬 问问K这里缺不缺帮手", action = function()
+                S.unlockWaiter = true
+                TimeSystem.addMinutes(5)
+                return "商业区"
+            end })
+        else
+            table.insert(choices, { text = "🍽️ 在酒馆打工（1小时 | 💰+）", action = function()
+                return doWorkWithEvent("waiter")
+            end })
+            if isLeiDeHome() then
+                table.insert(choices, { text = "🤝 和" .. (S.initialName or "莱德") .. "一起在酒馆打工（1小时 | 💰+）", action = function()
+                    return doWorkWithEvent("waiter", true)
+                end })
+            end
+        end
+
+        -- K互动
+        if not S.kMet then
+            table.insert(choices, { text = "💬 和K聊天", action = function()
+                addAffection("k", 5)
+                S.kMet = true
+                TimeSystem.addMinutes(15)
+                return "商业区"
+            end })
+            table.insert(choices, { text = "🍺 请K喝酒（-10金币）", action = function()
+                if S.money >= 10 then
+                    S.money = S.money - 10
+                    addAffection("k", 10)
+                    S.kMet = true
+                    TimeSystem.addMinutes(10)
+                end
+                return "商业区"
+            end })
+        else
+            table.insert(choices, { text = "💬 和K聊天", action = function()
+                addAffection("k", 3)
+                S.kTalkCount = (S.kTalkCount or 0) + 1
+                TimeSystem.addMinutes(10)
+                return "商业区"
+            end })
+        end
+
+        -- AI 自由对话（K）
+        local kChatLabel = "🤖 和K自由对话"
+        local kChatClient = package.loaded["network.Client"]
+        if kChatClient and not kChatClient.connected then
+            kChatLabel = "🤖 和K自由对话（连接中…）"
+        end
+        table.insert(choices, { text = kChatLabel, action = function()
+            local UIManager = require("systems.UIManager")
+            UIManager.openChat("K")
+        end })
+
+        -- K入队事件（好感>=100 且聊天>=3次 且未入队）
+        if (S.kAffection or 0) >= 100 and (S.kTalkCount or 0) >= 3 and not S.kInParty then
+            table.insert(choices, { text = "⚔️ 邀请K加入冒险", action = function()
+                TimeSystem.addMinutes(15)
+                return "K入队事件"
+            end })
+        end
+
+        -- 邀请K约会
+        if (S.kLevel or 1) >= 3 and S.kDateAvailable and not S.kVisiting then
+            table.insert(choices, { text = "🌸 邀请K出去约会", action = function()
+                S.kDateAvailable = false
+                S.dateTarget = "k"
+                return "约会选择"
+            end })
+        end
+
+        -- 辛奇互动
+        if (S.npcSinchi or 0) >= 15 then
+            table.insert(choices, { text = "💬 趁辛奇歇手时搭几句话", action = function()
+                TimeSystem.addMinutes(5)
+                local aff = S.npcSinchi or 0
+                S.npcSinchi = aff + 3
+                if aff >= 40 then
+                    GameState.showNotification("辛奇难得笑了笑：「你这小子，越来越有眼力见了。」他从柜台下摸出一小碟花生米推给你。(好感+3)")
+                elseif aff >= 25 then
+                    GameState.showNotification("辛奇放下账本，给你倒了杯水：「生意还行，就是最近酒价涨了。有空多来帮忙。」(好感+3)")
+                else
+                    GameState.showNotification("辛奇头也不抬地擦着杯子：「最近生意不错。你要是闲着，就来帮忙端盘子。」(好感+3)")
+                end
+                return "商业区"
+            end })
+        end
+
+        -- 小猫互动
+        if S.catPresent and not S.catAdopted then
+            table.insert(choices, { text = "🐱 和小猫互动", target = "小猫互动" })
+        elseif S.catAdopted then
+            table.insert(choices, { text = "🐱 和小猫玩", action = function()
+                S.catAffection = (S.catAffection or 0) + 3
+                TimeSystem.addMinutes(5)
+                return "商业区"
+            end })
+        end
+
+        -- 食物选项
+        table.insert(choices, { text = "🍻 喝一杯麦酒（10分钟 | 压力-5，-5金币）", action = function()
+            if S.money >= 5 then
+                S.money = S.money - 5
+                GameState.modStat("satiety", 5)
+                GameState.modStat("stress", -5)
+                TimeSystem.addMinutes(10)
+                local descs = {
+                    "K从酒桶里替你接了一杯琥珀色的麦酒，泡沫绵密地堆在杯口。"
+                    .. "你端起来抿了一口——入喉微苦，带着一股醇厚的麦芽香气，"
+                    .. "紧接着是淡淡的回甘。酒液顺着食道滑下去，一天的疲惫仿佛被冲淡了几分。"
+                    .. "你靠在吧台边，看着壁炉里跳动的火光，难得地觉得放松。\n(饱食度+5, 压力-5)",
+                    "壁炉旁的老位子空着，你坐了下来。K不用你开口便端来一杯麦酒，"
+                    .. "杯壁上凝着一层薄薄的水雾。你举杯啜饮，麦酒的苦味在舌尖散开，"
+                    .. "随后是一种温润的谷物甜香。酒馆里的喧闹声变成了模糊的背景音，"
+                    .. "你的肩膀不知不觉松弛下来。杯底见空时，心情已经好了不少。\n(饱食度+5, 压力-5)",
+                    "「今天的麦酒是新开的一桶。」K一边擦杯子一边说。"
+                    .. "你接过来闻了闻，果然比平时多了一层蜂蜜般的甜香。入口顺滑，"
+                    .. "苦味恰到好处，收尾时留下一丝温暖的余韵。你慢慢喝着，"
+                    .. "听着隔壁桌的冒险者们吹嘘今天的战果，嘴角不自觉地弯了弯。\n(饱食度+5, 压力-5)",
+                }
+                GameState.showNotification(descs[math.random(1, #descs)])
+            else
+                GameState.showNotification("金币不足！")
+            end
+            return "商业区"
+        end })
+        table.insert(choices, { text = "🍖 烤肉套餐（20分钟 | 饱食+35，-15金币）", action = function()
+            if S.money >= 15 then
+                S.money = S.money - 15
+                GameState.modStat("satiety", 35)
+                TimeSystem.addMinutes(20)
+                local descs = {
+                    "厨房传来一阵让人垂涎的肉香。不一会儿，K端上一个冒着热气的木盘——"
+                    .. "整块烤得焦褐的猪肋排斜靠在盘沿上，淋满了深褐色的蘑菇酱汁，"
+                    .. "旁边堆着烤得金黄的土豆块和几片腌渍的酸甜紫甘蓝。"
+                    .. "你拿起刀叉，切下第一块肉——外皮酥脆，里面粉红鲜嫩，肉汁和蘑菇酱混在一起，"
+                    .. "浓郁的滋味让你忍不住闭上了眼。等你回过神来，盘子已经见底了。\n(饱食度+35)",
+                    "今天的烤肉套餐用的是后院猎户新送来的鹿肉。K将厚厚的肉排在炭火上慢烤了半个时辰，"
+                    .. "表面撒了迷迭香和粗盐粒。端上桌时，肉排上还冒着细密的油泡，"
+                    .. "切开后里面是漂亮的玫瑰色。你蘸着蘑菇酱大口吃着，"
+                    .. "配上旁边焦香的烤面包和一小碟蒜蓉黄油。整盘吃完，你满足地拍了拍肚子，"
+                    .. "觉得这十五枚铜币花得太值了。\n(饱食度+35)",
+                    "你点了一份招牌烤肉套餐。等待的间隙，你看着K在厨房里忙碌——"
+                    .. "她将腌好的肉排放上铁架，动作优雅而熟练。壁炉的火光映在她认真的侧脸上。"
+                    .. "不多时，一盘丰盛的烤肉端到你面前：切成厚片的烤肉铺在面包片上，"
+                    .. "蘑菇酱汁浇成一条漂亮的弧线，配菜是烤洋葱和焦糖苹果。"
+                    .. "每一口都是扎实的满足感，热量从胃里扩散到全身。\n(饱食度+35)",
+                }
+                GameState.showNotification(descs[math.random(1, #descs)])
+            else
+                GameState.showNotification("金币不足！")
+            end
+            return "商业区"
+        end })
+        table.insert(choices, { text = "🥗 蔬菜沙拉（15分钟 | 饱食+20，-8金币）", action = function()
+            if S.money >= 8 then
+                S.money = S.money - 8
+                GameState.modStat("satiety", 20)
+                TimeSystem.addMinutes(15)
+                local descs = {
+                    "K端上一只浅木碗，里面铺着翠绿的生菜叶、切成薄片的黄瓜、红彤彤的小番茄，"
+                    .. "还有几片薄荷叶和碎核桃仁。橄榄油和苹果醋调成的酱汁淋在上面，"
+                    .. "清冽的酸香扑鼻而来。你叉起一大口，蔬菜的脆爽和酱汁的酸甜在嘴里融合，"
+                    .. "吃得整个人都清爽了。K看你吃完了，又递来一小块面包蘸碗底的酱汁。\n(饱食度+20)",
+                    "「这季节的蔬菜最水灵了。」K一边摆盘一边说。碗里的沙拉配色鲜亮——"
+                    .. "深绿的芝麻菜、紫红的甜菜根丝、橙色的胡萝卜碎，上面撒着一层细碎的羊奶酪。"
+                    .. "你淋上香醋橄榄油，拌匀后慢慢品尝。每一口都带着田野的清新气息，"
+                    .. "仿佛把整个春天吃进了肚子里。吃完之后，身体轻快了不少。\n(饱食度+20)",
+                }
+                GameState.showNotification(descs[math.random(1, #descs)])
+            else
+                GameState.showNotification("金币不足！")
+            end
+            return "商业区"
+        end })
+        table.insert(choices, { text = "🍞 黑面包配浓汤（15分钟 | 饱食+25，-5金币）", action = function()
+            if S.money >= 5 then
+                S.money = S.money - 5
+                GameState.modStat("satiety", 25)
+                TimeSystem.addMinutes(15)
+                local descs = {
+                    "K从厨房端出一碗冒着热气的浓汤和两片厚实的黑面包。汤是用牛骨熬了一整天的，"
+                    .. "褐色的汤底浓稠得几乎能挂住勺子，里面漂着土豆块、洋葱丝和碎肉末。"
+                    .. "你掰下一块黑面包蘸进汤里，面包吸饱了汤汁变得又软又香。"
+                    .. "一口面包一口汤，简单却让人从内到外都暖和起来。碗见底时，你擦了擦额头的汗。\n(饱食度+25)",
+                    "酒馆的黑面包是隔壁面包坊每天早上送来的，外壳硬实，内芯紧密，"
+                    .. "单吃虽然粗糙，但配上浓汤就是另一回事了。今天的汤是蘑菇鸡肉浓汤，"
+                    .. "表面浮着一层金黄的油脂，撒着细碎的百里香。你把面包撕成小块丢进碗里，"
+                    .. "看着它们慢慢膨胀、变软，然后连汤带面包一勺舀起来。"
+                    .. "朴素的味道，却有种说不出的踏实感。\n(饱食度+25)",
+                    "「穷人的美味。」辛奇老板经过你桌边时嘟囔了一句。你并不介意，"
+                    .. "因为眼前这碗浓汤闻起来实在太诱人了。你掰开黑面包——"
+                    .. "里面冒出一阵麦香和微微的酸味，那是天然发酵的味道。"
+                    .. "你把面包片浸在汤里，等它吸满了汤汁后送入口中。"
+                    .. "粗粝的面包和醇厚的浓汤混在一起，竟有种奇妙的和谐感，温暖又饱腹。\n(饱食度+25)",
+                }
+                GameState.showNotification(descs[math.random(1, #descs)])
+            else
+                GameState.showNotification("金币不足！")
+            end
+            return "商业区"
+        end })
+        table.insert(choices, { text = "🚻 去洗手间（5分钟 | 清洁+15）", action = function()
+            GameState.modStat("cleanliness", 15)
+            TimeSystem.addMinutes(5)
+            local descs = {
+                "你穿过嘈杂的大厅，推开后面那扇标着水滴符号的木门。"
+                .. "洗手间不大但收拾得很干净，铜质的水龙头擦得锃亮。"
+                .. "你拧开水龙头，冰凉的清水哗哗流出，你捧起水洗了把脸，"
+                .. "又用湿毛巾擦了擦脖子。镜子里的自己看起来精神了不少。\n(清洁+15)",
+                "酒馆的洗手间在走廊尽头，墙上挂着一盏昏黄的油灯。"
+                .. "你在水池前站定，看着镜子里有些狼狈的自己。凉水浇在脸上，"
+                .. "一天积攒的灰尘和汗渍被冲掉，皮肤泛起微微的红润。"
+                .. "你整了整衣领，用手指梳了梳头发，总算看起来像样了些。\n(清洁+15)",
+            }
+            GameState.showNotification(descs[math.random(1, #descs)])
+            return "商业区"
+        end })
+        table.insert(choices, { text = "🔙 返回广场", action = function() TimeSystem.addMinutes(1) S.currentArea = "square" return "商业区" end })
+
+        -- ══ 主线任务触发 ══
+        local mqTrigger = MainQuest.getCh3TriggerChoice("酒馆")
+        if mqTrigger then table.insert(choices, 1, mqTrigger) end
+
+        return { text = text, choices = choices }
+
+    elseif S.currentArea == "church" then
+        local text = "教堂\n\n"
+            .. "穹顶高远，回声在石柱间轻轻回荡。彩色玻璃窗将阳光筛成赤橙蓝紫，"
+            .. "在地面铺开一幅流动的光画。空气中弥漫着蜡烛和熏香的气息，令人不自觉放慢呼吸。\n\n"
+            .. "神父跪在祭坛前低声祈祷，几位信徒散坐在长椅上，双手合十，神情安宁。"
+
+        -- 梅菲斯随机事件
+        if math.random(1, 100) <= 20 and S.hour >= 10 and S.hour < 18 then
+            S.metManagerCount = (S.metManagerCount or 0) + 1
+            if S.metManagerCount == 1 then
+                text = text .. "\n\n你走进教堂，在长椅角落看见一位穿着考究的中年绅士。他注意到你的目光，微微颔首：「我是梅菲斯，妖精的邀请的经理。你看起来对历史感兴趣？」\n他的声音温和，眼神里带着审视：「第一次来这种地方？」"
+            else
+                text = text .. "\n\n你又遇见了梅菲斯。他正安静地祷告，起身后看见你：「又见面了。」"
+                if (S.meifeiAffection or 0) >= 50 then
+                    text = text .. "\n「最近还好吗？」他语气温和，「有空来妖精的邀请坐坐。」"
+                elseif (S.meifeiAffection or 0) >= 20 then
+                    text = text .. "\n「来祷告？」他问，「最近有什么烦恼？」"
+                else
+                    text = text .. "\n他礼貌地点点头，似乎不想多聊。"
+                end
+            end
+        end
+
+        local choices = {}
+        if not S.unlockCleric then
+            table.insert(choices, { text = "💬 询问修女是否需要帮手", action = function()
+                S.unlockCleric = true
+                TimeSystem.addMinutes(5)
+                return "商业区"
+            end })
+        else
+            table.insert(choices, { text = "✝️ 当见习教士（1小时 | 💰+）", action = function()
+                return doWorkWithEvent("cleric")
+            end })
+            if isLeiDeHome() then
+                table.insert(choices, { text = "🤝 和" .. (S.initialName or "莱德") .. "一起当教士（1小时 | 💰+）", action = function()
+                    return doWorkWithEvent("cleric", true)
+                end })
+            end
+        end
+        if (S.npcClarice or 0) >= 15 then
+            table.insert(choices, { text = "💬 向克丽丝修女请安", action = function()
+                TimeSystem.addMinutes(5)
+                local aff = S.npcClarice or 0
+                S.npcClarice = aff + 3
+                if aff >= 40 then
+                    GameState.showNotification("克丽丝笑着说：「你来了。今天的花开得很好，我摘了些装饰祭坛。」她顿了顿，「有你这样的朋友，真好。」(好感+3)")
+                elseif aff >= 25 then
+                    GameState.showNotification("克丽丝递给你一杯温水：「最近看你忙碌，记得照顾好自己。神会保佑善良的人。」(好感+3)")
+                else
+                    GameState.showNotification("克丽丝合上祈祷书，温和地说：「愿光明照耀你的前路。有烦恼可以来这里坐坐。」(好感+3)")
+                end
+                return "商业区"
+            end })
+        end
+        table.insert(choices, { text = "🙏 祈祷（30分钟 | 压力-10）", action = function()
+            TimeSystem.addMinutes(30)
+            local theologyLv = S.theologyLevel or 0
+            local stressReduction = 10 + theologyLv * 3  -- 每级神学多减3压力
+            GameState.modStat("stress", -(stressReduction))
+            local descs = {
+                "你在最后一排长椅前跪下，双手合十，闭上眼睛。"
+                .. "阳光透过彩色玻璃窗洒下来，将你的影子染成了斑斓的色彩。"
+                .. "风琴的低音从某个角落隐约传来，像是大地在轻声呼吸。"
+                .. "你什么也没有想，什么也没有求——只是安静地跪着，"
+                .. "让那些纷杂的念头像水面的涟漪一样慢慢散去。"
+                .. "不知过了多久，你睁开眼，发现肩上的重量轻了许多。",
+                "教堂里很安静，只有你和几个虔诚的老人。你在烛台前的祈祷垫上跪下，"
+                .. "蜡烛的火苗在你面前轻轻摇曳，投下摇晃的暖光。"
+                .. "你默默念着，不是什么固定的祷词，只是一些心底的话——"
+                .. "关于今天的疲惫，关于明天的不确定，关于那些放不下又说不出口的东西。"
+                .. "蜡油沿着烛身缓缓流下，凝成透明的泪珠。等你站起来时，心里踏实了一些。",
+                "你选了一个靠窗的位子坐下，阳光从圆形的花窗透进来，"
+                .. "地面上映出圣徒的剪影。你低下头，双手交握，开始默默祈祷。"
+                .. "起初脑子里还乱糟糟的，但渐渐地，教堂的宁静像一层看不见的毯子裹住了你。"
+                .. "空气里淡淡的乳香气息，远处钟楼传来的迟钝的嗡鸣，一切都在说着「没关系」。"
+                .. "你深深地吸了一口气，又缓缓吐出来，觉得世界柔软了一点。",
+                "你站在祭坛前的十字架下，仰头看着彩色玻璃上描绘的圣人故事。"
+                .. "日光穿透了圣人手中的法杖，在你脸上投下一抹金色的光斑。"
+                .. "你双手合十，轻声说了些什么——连你自己都没听清。"
+                .. "但那些话说出口的瞬间，胸口某个拧紧的结似乎松开了。"
+                .. "你在长椅上坐了好一会儿，听着自己平稳下来的呼吸声，直到内心彻底安静。",
+            }
+            local suffix = "\n(压力-" .. stressReduction .. ")"
+            if theologyLv > 0 then suffix = suffix .. "（神学Lv." .. theologyLv .. " 加成）" end
+            GameState.showNotification(descs[math.random(1, #descs)] .. suffix)
+            return "商业区"
+        end })
+        table.insert(choices, { text = "🚻 去洗手间", action = function()
+            GameState.modStat("cleanliness", 15)
+            TimeSystem.addMinutes(5)
+            local descs = {
+                "教堂的洗手间在后院的小石屋里，推门进去一股肥皂和草药的清香。"
+                .. "青铜水盆里盛着干净的凉水，你捧起来仔细洗了脸和手，"
+                .. "又用挂在墙上的粗麻巾擦干。镜子是一面磨得发亮的铜片，"
+                .. "映出的你看起来比来时精神了不少。\n(清洁+15)",
+                "你沿着走廊走到教堂后面的小洗手间。石砌的水池里流着细细的清泉，"
+                .. "大概是从山上引下来的。水很凉，浇在脸上激得你一个哆嗦，"
+                .. "但随即整个人都清醒了。你擦干脸上的水珠，整了整衣服，"
+                .. "觉得自己总算不像刚从泥地里爬出来的了。\n(清洁+15)",
+            }
+            GameState.showNotification(descs[math.random(1, #descs)])
+            return "商业区"
+        end })
+        table.insert(choices, { text = "🔙 返回广场", action = function() TimeSystem.addMinutes(1) S.currentArea = "square" return "商业区" end })
+
+        -- ══ 主线任务触发 ══
+        local mqTrigger = MainQuest.getCh2TriggerChoice("教堂")
+            or MainQuest.getCh3TriggerChoice("教堂")
+        if mqTrigger then table.insert(choices, 1, mqTrigger) end
+
+        return { text = text, choices = choices }
+
+    elseif S.currentArea == "smithy" then
+        local choices = {}
+        if not S.unlockBlacksmith then
+            table.insert(choices, { text = "💬 问麦拿拿收不收学徒", action = function()
+                S.unlockBlacksmith = true
+                TimeSystem.addMinutes(5)
+                return "商业区"
+            end })
+        else
+            table.insert(choices, { text = "🔨 当铁匠学徒（1小时 | 💰+）", action = function()
+                return doWorkWithEvent("blacksmith")
+            end })
+            if isLeiDeHome() then
+                table.insert(choices, { text = "🤝 和" .. (S.initialName or "莱德") .. "一起当学徒（1小时 | 💰+）", action = function()
+                    return doWorkWithEvent("blacksmith", true)
+                end })
+            end
+        end
+        if (S.npcMacnana or 0) >= 15 then
+            table.insert(choices, { text = "💬 趁麦拿拿歇锤时搭话", action = function()
+                TimeSystem.addMinutes(5)
+                local aff = S.npcMacnana or 0
+                S.npcMacnana = aff + 3
+                if aff >= 40 then
+                    GameState.showNotification("麦拿拿从炉边拿起一个小铁坠递给你：「做多了，送你一个。」他表情虽然凶巴巴的，但眼神柔和了不少。(好感+3)")
+                elseif aff >= 25 then
+                    GameState.showNotification("麦拿拿擦了把汗，把锻好的刀刃放进水槽，嗤的一声白雾升腾：「想学打铁？不怕热就来。」(好感+3)")
+                else
+                    GameState.showNotification("麦拿拿头也没回，锤子叮叮当当地敲着铁块：「说话快点，我忙。」(好感+3)")
+                end
+                return "商业区"
+            end })
+        end
+        table.insert(choices, { text = "🔙 返回广场", action = function() TimeSystem.addMinutes(1) S.currentArea = "square" return "商业区" end })
+
+        return {
+            text = "铁匠铺\n\n"
+                .. "一股灼热的气浪裹着金属焦灼的气味扑面而来。"
+                .. "炉膛里的炭火烧得通红，风箱一鼓一缩，发出沉闷的呼呼声。"
+                .. "矮人铁匠麦拿拿赤膊站在铁砧前，锤子高高扬起再重重落下，叮——叮——叮，"
+                .. "每一击都溅起细碎的火星。墙上挂满了锻好的农具、刀剑和铁钉，在火光映照下泛着暗红色的光泽。",
+            choices = choices,
+        }
+    end
+end
+
+---===================== 港口 =====================
+--- Twine pid 23: 忠实原文
+
+
+end

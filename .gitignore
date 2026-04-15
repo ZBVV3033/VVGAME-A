@@ -1,0 +1,33 @@
+# 构建产物
+.build/
+dist/
+
+# 临时文件
+.tmp/
+
+# 引擎只读资源（不属于项目代码）
+engine-docs/
+examples/
+templates/
+urhox-libs/
+lua-tools/
+schemas/
+.emmylua/
+
+# AI/编辑器工作配置
+.agent/
+.claude/
+.cli/
+
+# 项目配置（引擎自动生成）
+.project/
+
+# 日志
+logs/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
