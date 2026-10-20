@@ -1,0 +1,15 @@
+{
+  "entry": "main.lua",
+  "version": "1.0.0",
+  "taptap_publish": {
+    "title": "雾海号 The Last Voyage",
+    "description": "",
+    "category": "word",
+    "screen_orientation": "landscape"
+  },
+  "assets": {
+    "icon": "",
+    "screenshots": [],
+    "promotional_image": ""
+  }
+}

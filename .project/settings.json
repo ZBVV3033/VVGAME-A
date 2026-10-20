@@ -1,0 +1,18 @@
+{
+  "build": {
+    "generate_fs_path": true,
+    "output_dir": "../dist",
+    "asset_dirs": [
+      "../assets",
+      "../scripts"
+    ],
+    "asset_ignores": [
+      "../assets/image/Editor"
+    ]
+  },
+  "@runtime": {
+    "multiplayer": {
+      "enabled": false
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "preload_groups": [],
+  "groups": {
+    "default": [
+      "scripts/**"
+    ]
+  }
+}
